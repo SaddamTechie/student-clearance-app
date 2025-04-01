@@ -4,6 +4,7 @@ const Student = require('../models/Student');
 const Staff = require('../models/Staff');
 const Report = require('../models/Report');
 const Request = require('../models/Request');
+const Clearance = require('../models/Clearance')
 const qrcode = require('qrcode');
 const { sendEmail } = require('../utils/notifications');
 const { generateCertificate } = require('../utils/pdfGenerator');
@@ -27,6 +28,7 @@ const authMiddleware = async (req, res, next) => {
     res.status(401).json({ message: 'Invalid or expired token' });
   }
 };
+
 
 // Role-based middleware
 const roleMiddleware = (roles) => (req, res, next) => {
@@ -64,6 +66,42 @@ router.post('/login', async (req, res) => {
   }
 });
 
+
+
+
+const generateObligations = (studentId) => {
+  const departments = ['finance', 'library', 'academic', 'hostel'];
+  const obligations = new Map();
+
+  departments.forEach((dept) => {
+    const numObligations = Math.floor(Math.random() * 3); // 0-2 obligations per dept
+    const deptObligations = [];
+
+    for (let i = 0; i < numObligations; i++) {
+      const type = dept === 'library' ? 'lost_book' : dept === 'finance' ? 'fee' : dept === 'hostel' ? 'hostel_item' : 'academic_fee';
+      const descriptions = {
+        lost_book: [`Lost book: 'Math 101'`, `Lost book: 'Physics 202'`, `Lost book: 'History 101'`],
+        fee: [`Semester fee unpaid`, `Late payment penalty`, `Lab fee`],
+        hostel_item: [`Missing bed sheet`, `Broken chair`, `Unreturned key`],
+        academic_fee: [`Exam fee unpaid`, `Thesis fee`, `Lab materials`],
+      };
+      const amount = Math.floor(Math.random() * 1000) + 100; // 100-1100 units
+      deptObligations.push({
+        type,
+        description: descriptions[type][Math.floor(Math.random() * descriptions[type].length)],
+        amount: type === 'lost_book' || type === 'fee' ? amount : 0, // Only financial obligations have amounts
+      });
+    }
+    obligations.set(dept, deptObligations);
+  });
+
+  return obligations;
+};
+
+
+
+
+
 // Register Student
 router.post('/register', async (req, res) => {
   const { studentId, name, email, password } = req.body;
@@ -78,6 +116,12 @@ router.post('/register', async (req, res) => {
     const hashedPassword = await bcrypt.hash(password, 10);
     const student = new Student({ studentId, name, email, password: hashedPassword });
     await student.save();
+    // Generate clearance with random obligations
+    const clearance = new Clearance({
+      studentId,
+      departments: generateObligations(studentId),
+    });
+    await clearance.save();
     res.status(201).json({ message: 'Student registered', student });
   } catch (err) {
     res.status(500).json({ message: 'Server error', error: err.message });
@@ -195,32 +239,48 @@ router.get('/qr', authMiddleware, roleMiddleware(['student']), async (req, res) 
 
 
 // Get Clearance Status (Student Only)
-router.get('/status', authMiddleware, roleMiddleware(['student']), async (req, res) => {
-  const studentId = req.user.id;
+// router.get('/status', authMiddleware, roleMiddleware(['student']), async (req, res) => {
+//   const studentId = req.user.id;
+//   try {
+//     const student = await Student.findOne({ studentId });
+//     if (!student) return res.status(404).json({ message: 'Student not found' });
+
+//     const requests = await Request.find({ studentId });
+//     const departments = ['finance', 'library', 'department', 'hostel', 'administration'];
+//     const status = {};
+//     const requestsSent = {};
+
+//     departments.forEach((department) => {
+//       status[department] = student.clearanceStatus[department] || 'pending';
+//       requestsSent[department] = false;
+//     });
+
+//     requests.forEach((request) => {
+//       status[request.department] = request.status;
+//       requestsSent[request.department] = true;
+//     });
+
+//     res.json({ status, requestsSent, email: student.email ,studentId: studentId});
+//   } catch (err) {
+//     res.status(500).json({ message: 'Server error', error: err.message });
+//   }
+// });
+
+
+router.get('/status', authMiddleware, async (req, res) => {
+  // if (req.user.role !== 'student') {
+  //   return res.status(403).json({ message: 'Unauthorized' });
+  // }
   try {
-    const student = await Student.findOne({ studentId });
-    if (!student) return res.status(404).json({ message: 'Student not found' });
-
-    const requests = await Request.find({ studentId });
-    const departments = ['finance', 'library', 'department', 'hostel', 'administration'];
-    const status = {};
-    const requestsSent = {};
-
-    departments.forEach((department) => {
-      status[department] = student.clearanceStatus[department] || 'pending';
-      requestsSent[department] = false;
-    });
-
-    requests.forEach((request) => {
-      status[request.department] = request.status;
-      requestsSent[request.department] = true;
-    });
-
-    res.json({ status, requestsSent, email: student.email ,studentId: studentId});
-  } catch (err) {
-    res.status(500).json({ message: 'Server error', error: err.message });
+    const clearance = await Clearance.findOne({ studentId: req.user.id });
+    if (!clearance) return res.status(404).json({ message: 'Clearance not found' });
+    res.json(clearance);
+  } catch (error) {
+    res.status(500).json({ message: 'Failed to fetch status' });
   }
 });
+
+
 
 // Get Requests (Staff Only, Department-Specific)
 router.get('/requests', authMiddleware, roleMiddleware(['staff', 'admin']), async (req, res) => {
@@ -232,6 +292,7 @@ router.get('/requests', authMiddleware, roleMiddleware(['staff', 'admin']), asyn
     res.status(500).json({ message: 'Server error', error: err.message });
   }
 });
+
 
 
 // Post Report 
@@ -303,37 +364,114 @@ router.patch('/report/:id', authMiddleware, async (req, res) => {
 });
 
 
+// router.post('/verify', authMiddleware, async (req, res) => {
+//   if (req.user.role !== 'staff') {
+//     return res.status(403).json({ message: 'Unauthorized' });
+//   }
+//   const { id } = req.body; // Scanned student ID from QR
+//   if (!id) {
+//     return res.status(400).json({ message: 'Student ID required' });
+//   }
+
+//   try {
+//     const clearance = await Request.findOne({ studentId: id });
+//     if (!clearance) {
+//       console.log('Student Req not found');
+//       return res.status(404).json({ message: 'Student not found' });
+//     }
+//     const student = await Student.findOne({ studentId: id });
+//     if (!student) {
+//       console.log('Student not found');
+//       return res.status(404).json({ message: 'Student not found' });
+//     }
+//     // Return clearance status for the staff's department
+//     const departmentStatus = student.clearanceStatus.get(req.user.department) || 'pending';
+//     res.json({
+//       studentId: id,
+//       email: student.email,
+//       department: req.user.department,
+//       status: departmentStatus,
+//     });
+//   } catch (error) {
+//     console.error('Error verifying student:', error);
+//     res.status(500).json({ message: 'Failed to verify student' });
+//   }
+// });
+
+
+
+
+
 router.post('/verify', authMiddleware, async (req, res) => {
   if (req.user.role !== 'staff') {
     return res.status(403).json({ message: 'Unauthorized' });
   }
-  const { id } = req.body; // Scanned student ID from QR
-  if (!id) {
-    return res.status(400).json({ message: 'Student ID required' });
-  }
-
+  const { id } = req.body;
   try {
-    const clearance = await Request.findOne({ studentId: id });
-    if (!clearance) {
-      console.log('Student Req not found');
-      return res.status(404).json({ message: 'Student not found' });
-    }
-    const student = await Student.findOne({ studentId: id });
-    if (!student) {
-      console.log('Student not found');
-      return res.status(404).json({ message: 'Student not found' });
-    }
-    // Return clearance status for the staff's department
-    const departmentStatus = student.clearanceStatus.get(req.user.department) || 'pending';
+    const clearance = await Clearance.findOne({ studentId: id });
+    if (!clearance) return res.status(404).json({ message: 'Student not found' });
+    const user = await Student.findOne({ studentId:id });
+    if (!user) return res.status(404).json({ message: 'Student not found' });
+    const obligations = clearance.departments.get(req.user.department) || [];
     res.json({
       studentId: id,
-      email: student.email,
+      email: user.email,
       department: req.user.department,
-      status: departmentStatus,
+      obligations,
     });
   } catch (error) {
-    console.error('Error verifying student:', error);
     res.status(500).json({ message: 'Failed to verify student' });
+  }
+});
+
+
+
+
+
+
+router.post('/pay', authMiddleware, async (req, res) => {
+  // if (req.user.role !== 'student') {
+  //   return res.status(403).json({ message: 'Unauthorized' });
+  // }
+  const { department, obligationIndex } = req.body; // Which obligation to resolve
+  const studentId = req.user.id;
+
+  try {
+    const clearance = await Clearance.findOne({ studentId });
+    if (!clearance) return res.status(404).json({ message: 'Clearance not found' });
+
+    const obligations = clearance.departments.get(department);
+    if (!obligations || obligationIndex >= obligations.length) {
+      return res.status(400).json({ message: 'Invalid obligation' });
+    }
+
+    const obligation = obligations[obligationIndex];
+    if (obligation.resolved) {
+      return res.status(400).json({ message: 'Obligation already resolved' });
+    }
+    if (obligation.amount === 0) {
+      return res.status(400).json({ message: 'No payment required' });
+    }
+
+    obligation.resolved = true;
+    obligation.resolvedAt = new Date();
+    clearance.departments.set(department, obligations);
+
+    // Check if all obligations are resolved
+    let allResolved = true;
+    for (const [_, deptObligations] of clearance.departments) {
+      if (deptObligations.some((o) => !o.resolved)) {
+        allResolved = false;
+        break;
+      }
+    }
+    clearance.overallStatus = allResolved ? 'cleared' : 'pending';
+
+    await clearance.save();
+    res.json({ message: 'Payment processed', clearance });
+  } catch (error) {
+    console.error('Error processing payment:', error);
+    res.status(500).json({ message: 'Payment failed' });
   }
 });
 

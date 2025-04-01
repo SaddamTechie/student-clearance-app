@@ -4,26 +4,19 @@ import axios from 'axios';
 import { apiUrl } from '../../config';
 import { useSession } from '@/ctx';
 
-export default function HomeScreen() {
+export default function ClearanceScreen() {
   const [clearance, setClearance] = useState(null);
-  const [error, setError] = useState(null);
   const { session } = useSession();
 
   useEffect(() => {
     const fetchClearance = async () => {
-      if (!session) {
-        setError('No session available');
-        return;
-      }
       try {
         const response = await axios.get(`${apiUrl}/status`, {
           headers: { Authorization: `Bearer ${session}` },
         });
         setClearance(response.data);
-        setError(null);
       } catch (error) {
         console.error('Error fetching clearance:', error);
-        setError(error.response?.data?.message || 'Failed to fetch clearance data');
       }
     };
     fetchClearance();
@@ -42,13 +35,12 @@ export default function HomeScreen() {
     }
   };
 
-  if (error) return <Text style={styles.error}>{error}</Text>;
   if (!clearance) return <Text>Loading...</Text>;
 
   return (
     <ScrollView style={styles.container}>
       <Text style={styles.title}>Clearance Status</Text>
-      {Object.entries(clearance.departments || {}).map(([dept, obligations]) => (
+      {Array.from(clearance.departments).map(([dept, obligations]) => (
         <View key={dept} style={styles.department}>
           <Text style={styles.deptTitle}>{dept.toUpperCase()}</Text>
           {obligations.length === 0 ? (
@@ -79,5 +71,4 @@ const styles = StyleSheet.create({
   deptTitle: { fontSize: 18, fontWeight: 'bold' },
   obligation: { borderWidth: 1, padding: 10, marginVertical: 5 },
   overall: { fontSize: 18, marginTop: 20, textAlign: 'center' },
-  error: { fontSize: 16, color: 'red', textAlign: 'center', padding: 20 },
 });

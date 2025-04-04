@@ -12,18 +12,19 @@ const ClearanceSchema = new mongoose.Schema({
   studentId: { type: String, required: true, unique: true },
   departments: {
     type: Map,
-    of: [ObligationSchema], // Array of obligations per department
+    of: [ObligationSchema],
     default: () => new Map([
-      ['finance', []],
-      ['library', []],
-      ['academic', []],
-      ['hostel', []], // Add more departments as needed
+      ['finance', []], ['library', []], ['academic', []], ['hostel', []],
     ]),
   },
-  overallStatus: {
-    type: String,
-    enum: ['pending', 'cleared'],
-    default: 'pending',
+  overallStatus: { type: String, enum: ['pending', 'cleared'], default: 'pending' },
+  clearanceRequested: { type: Boolean, default: false }, // New
+  departmentStatus: { // New
+    type: Map,
+    of: String,
+    default: () => new Map([
+      ['finance', 'pending'], ['library', 'pending'], ['academic', 'pending'], ['hostel', 'pending'],
+    ]),
   },
 });
 

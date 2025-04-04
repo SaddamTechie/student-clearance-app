@@ -37,7 +37,7 @@ function AdminPanel({ onLogout }) {
         <option value="library">Library</option>
         <option value="department">Department</option>
         <option value="hostel">Hostel</option>
-        <option value="administration">Administration</option>
+        <option value="academic">Academic</option>
       </select>
       <button onClick={handleRegister}>Register Staff</button>
     </div>

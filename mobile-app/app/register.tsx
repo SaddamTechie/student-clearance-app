@@ -35,7 +35,7 @@ export default function RegisterScreen() {
       <Text style={styles.title}>Register</Text>
       <TextInput
         style={styles.input}
-        placeholder="Student ID"
+        placeholder="Student Registration Number"
         value={studentId}
         onChangeText={setStudentId}
       />

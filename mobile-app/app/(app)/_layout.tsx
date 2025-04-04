@@ -9,7 +9,6 @@ import { Text } from 'react-native';
 import { Redirect } from 'expo-router';
 
 import { useSession } from '../../ctx';
-import ClearanceScreen from './clearance';
 
 const Tab = createBottomTabNavigator();
 
@@ -22,12 +21,11 @@ function AppTabs() {
           if (route.name === 'Home') iconName = 'home';
           else if (route.name === 'QR') iconName = 'qr-code';
           else if (route.name === 'Certificate') iconName = 'document';
-          // else if (route.name === 'Report') iconName = 'alert';
-          else if (route.name === 'Clearance') iconName = 'alert';
+          else if (route.name === 'Report') iconName = 'alert';
           else if (route.name === 'Profile') iconName = 'person'; // Profile icon
           return <Ionicons name={iconName} size={size} color={color} />;
         },
-        tabBarActiveTintColor: '#007AFF',
+        tabBarActiveTintColor: '#7ABB3B',
         tabBarInactiveTintColor: 'gray',
         headerShown: false,
       })}
@@ -37,7 +35,6 @@ function AppTabs() {
       <Tab.Screen name="Certificate" component={CertificateScreen}  />
       <Tab.Screen name="Report" component={ReportScreen}  />
       <Tab.Screen name="Profile" component={ProfileScreen}  />
-      <Tab.Screen name="Clearance" component={ClearanceScreen} />
     </Tab.Navigator>
   );
 }

@@ -6,6 +6,7 @@ import Requests from './components/Requests';
 import Profile from './components/Profile';
 import ReportList from './components/ReportList';
 import QRScanner from './components/QRScanner';
+import StaffDashboard from './components/StaffDashboard';
 
 const apiUrl = 'http://localhost:5000/api/clearance';
 
@@ -59,6 +60,12 @@ function App() {
           path="/scan"
           element={
               <QRScanner />
+          }
+        />
+        <Route
+          path="/requests"
+          element={
+              <StaffDashboard/>
           }
         />
       </Routes>

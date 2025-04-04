@@ -1,12 +1,14 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, Button, StyleSheet, ScrollView } from 'react-native';
+import { View, Text, Button, StyleSheet, ScrollView, TouchableOpacity } from 'react-native';
 import axios from 'axios';
 import { apiUrl } from '../../config';
 import { useSession } from '@/ctx';
+import { Ionicons } from '@expo/vector-icons';
 
 export default function HomeScreen() {
   const [clearance, setClearance] = useState(null);
   const [error, setError] = useState(null);
+  const [selectedDepartment, setSelectedDepartment] = useState(null);
   const { session } = useSession();
 
   useEffect(() => {
@@ -37,6 +39,7 @@ export default function HomeScreen() {
         { headers: { Authorization: `Bearer ${session}` } }
       );
       setClearance(response.data.clearance);
+      setSelectedDepartment(null); // Reset selected department after payment
     } catch (error) {
       console.error('Error processing payment:', error);
     }
@@ -64,43 +67,54 @@ export default function HomeScreen() {
       dept.some(obl => !obl.resolved && obl.amount > 0)
     );
 
+  const departmentStatuses = Object.keys(clearance.departments).map(dept => {
+    const isResolved = clearance.departments[dept].every(obl => obl.resolved || obl.amount === 0);
+    return { department: dept, isResolved };
+  });
+
   return (
     <ScrollView style={styles.container}>
       <Text style={styles.title}>Clearance Status</Text>
-      {clearance.clearanceRequested ? (
-        <Text style={styles.info}>Clearance requested. Awaiting department approvals.</Text>
-      ) : (
-        <Text style={styles.info}>Review your requirements below before requesting clearance.</Text>
-      )}
-      {Object.entries(clearance.departments || {}).map(([dept, obligations]) => (
-        <View key={dept} style={styles.department}>
-          <Text style={styles.deptTitle}>{dept.toUpperCase()}</Text>
-          {obligations.length === 0 ? (
+      {selectedDepartment ? (
+        <View>
+          <Text style={styles.deptTitle}>{selectedDepartment.toUpperCase()}</Text>
+          {clearance.departments[selectedDepartment].length === 0 ? (
             <Text>No issues</Text>
           ) : (
-            obligations.map((obl, index) => (
+            clearance.departments[selectedDepartment].map((obl, index) => (
               <View key={index} style={styles.obligation}>
                 <Text>{obl.description}</Text>
                 <Text>Amount: {obl.amount}</Text>
                 <Text>Status: {obl.resolved ? 'Resolved' : 'Pending'}</Text>
                 {!obl.resolved && obl.amount > 0 && (
-                  <Button title="Pay Now" onPress={() => handlePay(dept, index)} />
+                  <Button title="Pay Now" onPress={() => handlePay(selectedDepartment, index)} />
                 )}
               </View>
             ))
           )}
-          {clearance.clearanceRequested && (
-            <Text>Department Status: {clearance.departmentStatus[dept]}</Text>
-          )}
+          <Button title="Back" onPress={() => setSelectedDepartment(null)} />
         </View>
-      ))}
-      <Text style={styles.overall}>Overall Status: {clearance.overallStatus}</Text>
-      {!clearance.clearanceRequested && (
-        <Button
-          title="Request Clearance"
-          onPress={handleRequestClearance}
-          disabled={!canRequestClearance}
-        />
+      ) : (
+        <>
+          {departmentStatuses.map(({ department, isResolved }) => (
+            <TouchableOpacity
+              key={department}
+              style={[styles.departmentCard, isResolved ? styles.resolved : styles.notResolved]}
+              onPress={() => setSelectedDepartment(department)}
+            >
+              <Text style={styles.deptText}>{department.toUpperCase()}</Text>
+              <Text style={styles.statusText}>{isResolved ? 'Resolved' : 'Not Resolved'}</Text>
+            </TouchableOpacity>
+          ))}
+          <Text style={styles.overall}>Overall Status: {clearance.overallStatus}</Text>
+          {!clearance.clearanceRequested && (
+            <Button
+              title="Request Clearance"
+              onPress={handleRequestClearance}
+              disabled={!canRequestClearance}
+            />
+          )}
+        </>
       )}
     </ScrollView>
   );
@@ -110,9 +124,18 @@ const styles = StyleSheet.create({
   container: { flex: 1, padding: 20 },
   title: { fontSize: 24, marginBottom: 20, textAlign: 'center' },
   info: { fontSize: 16, marginBottom: 20, textAlign: 'center', color: '#666' },
-  department: { marginBottom: 20 },
-  deptTitle: { fontSize: 18, fontWeight: 'bold' },
+  departmentCard: {
+    padding: 15,
+    marginVertical: 5,
+    borderRadius: 10,
+    elevation: 2,
+  },
+  resolved: { backgroundColor: '#c6efce' },
+  notResolved: { backgroundColor: '#ffc2c7' },
+  deptText: { fontSize: 18, fontWeight: 'bold' },
+  statusText: { fontSize: 16, color: '#666', marginTop: 2 },
   obligation: { borderWidth: 1, padding: 10, marginVertical: 5 },
   overall: { fontSize: 18, marginTop: 20, marginBottom: 20, textAlign: 'center' },
   error: { fontSize: 16, color: 'red', textAlign: 'center', padding: 20 },
+  deptTitle: { fontSize: 18, fontWeight: 'bold', marginBottom: 10 },
 });

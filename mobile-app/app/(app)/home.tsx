@@ -34,6 +34,13 @@ export default function HomeScreen() {
   }, [session]);
 
   const handlePay = async (department, obligations) => {
+    const unresolvedObligations = obligations.filter(obl => !obl.resolved && obl.amount > 0);
+
+    if (unresolvedObligations.length === 0) {
+      alert('All obligations in this department are resolved.');
+      return;
+    }
+
     navigation.navigate('PaymentMethod', { department, obligations });
   };
 
@@ -51,8 +58,18 @@ export default function HomeScreen() {
     }
   };
 
-  if (error) return <Text style={styles.error}>{error}</Text>;
-  if (!clearance) return <Text>Loading...</Text>;
+  if (error) return (
+    <View style={styles.errorContainer}>
+      <Text style={styles.errorText}>{error}</Text>
+      <Ionicons name="alert-circle" size={24} color="#FF9933" />
+    </View>
+  );
+  if (!clearance) return (
+    <View style={styles.loadingContainer}>
+      <Text>Loading...</Text>
+      <Ionicons name="sync-circle" size={24} color="#7ABB3B" />
+    </View>
+  );
 
   const canRequestClearance = !clearance.clearanceRequested && 
     !Object.values(clearance.departments).some(dept => 
@@ -97,6 +114,7 @@ export default function HomeScreen() {
             >
               <Text style={styles.deptText}>{department.toUpperCase()}</Text>
               <Text style={styles.statusText}>{isResolved ? 'Resolved' : 'Not Resolved'}</Text>
+              <Ionicons name={isResolved ? 'checkmark-circle' : 'ellipse-outline'} size={24} color={isResolved ? '#7ABB3B' : '#FF9933'} />
             </TouchableOpacity>
           ))}
           <Text style={styles.overall}>Overall Status: {clearance.overallStatus}</Text>
@@ -105,6 +123,7 @@ export default function HomeScreen() {
               title="Request Clearance"
               onPress={handleRequestClearance}
               disabled={!canRequestClearance}
+              style={styles.requestButton}
             />
           )}
         </>
@@ -114,8 +133,8 @@ export default function HomeScreen() {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, padding: 20 },
-  title: { fontSize: 24, marginBottom: 20, textAlign: 'center' },
+  container: { flex: 1, padding: 20, backgroundColor: '#f5f5f5' },
+  title: { fontSize: 24, marginBottom: 20, textAlign: 'center', color: '#7ABB3B' },
   info: { fontSize: 16, marginBottom: 20, textAlign: 'center', color: '#666' },
   departmentCard: {
     padding: 15,
@@ -129,7 +148,10 @@ const styles = StyleSheet.create({
   statusText: { fontSize: 16, color: '#666', marginTop: 2 },
   obligation: { borderWidth: 1, padding: 10, marginVertical: 5 },
   overall: { fontSize: 18, marginTop: 20, marginBottom: 20, textAlign: 'center' },
-  error: { fontSize: 16, color: 'red', textAlign: 'center', padding: 20 },
+  errorContainer: { flex: 1, justifyContent: 'center', alignItems: 'center' },
+  errorText: { fontSize: 16, color: 'red', marginBottom: 10 },
+  loadingContainer: { flex: 1, justifyContent: 'center', alignItems: 'center' },
+  requestButton: { backgroundColor: '#7ABB3B', padding: 10, borderRadius: 5 },
   deptTitle: { fontSize: 18, fontWeight: 'bold', marginBottom: 10 },
   totalText: { fontSize: 16, fontWeight: 'bold', marginBottom: 10 },
 });

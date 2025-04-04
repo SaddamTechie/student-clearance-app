@@ -9,6 +9,7 @@ import { Text } from 'react-native';
 import { Redirect } from 'expo-router';
 
 import { useSession } from '../../ctx';
+import StatusScreen from './status';
 
 const Tab = createBottomTabNavigator();
 
@@ -21,7 +22,8 @@ function AppTabs() {
           if (route.name === 'Home') iconName = 'home';
           else if (route.name === 'QR') iconName = 'qr-code';
           else if (route.name === 'Certificate') iconName = 'document';
-          else if (route.name === 'Report') iconName = 'alert';
+          // else if (route.name === 'Report') iconName = 'alert';
+          else if (route.name === 'Status') iconName = 'alert';
           else if (route.name === 'Profile') iconName = 'person'; // Profile icon
           return <Ionicons name={iconName} size={size} color={color} />;
         },
@@ -33,7 +35,8 @@ function AppTabs() {
       <Tab.Screen name="Home" component={HomeScreen}  />
       <Tab.Screen name="QR" component={QRScreen}  />
       <Tab.Screen name="Certificate" component={CertificateScreen}  />
-      <Tab.Screen name="Report" component={ReportScreen}  />
+      {/* <Tab.Screen name="Report" component={ReportScreen}  /> */}
+      <Tab.Screen name="Status" component={StatusScreen}  />
       <Tab.Screen name="Profile" component={ProfileScreen}  />
     </Tab.Navigator>
   );

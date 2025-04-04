@@ -18,14 +18,15 @@ const ClearanceSchema = new mongoose.Schema({
     ]),
   },
   overallStatus: { type: String, enum: ['pending', 'cleared'], default: 'pending' },
-  clearanceRequested: { type: Boolean, default: false }, // New
-  departmentStatus: { // New
+  clearanceRequested: { type: Boolean, default: false },
+  departmentStatus: {
     type: Map,
-    of: String,
+    of: { type: String, enum: ['pending', 'reviewing', 'cleared', 'rejected'], default: 'pending' },
     default: () => new Map([
       ['finance', 'pending'], ['library', 'pending'], ['academic', 'pending'], ['hostel', 'pending'],
     ]),
   },
+  comments: { type: Map, of: String }, // Optional, for staff comments
 });
 
 const Clearance = mongoose.model('Clearance', ClearanceSchema);

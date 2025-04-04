@@ -47,10 +47,10 @@ const StaffDashboard = () => {
           <p><strong>Status:</strong> {req.status}</p>
           <p><strong>Obligations:</strong> {req.obligations.join(', ')}</p>
           <p><strong>Comment:</strong> {req.comment || 'None'}</p>
-          <button onClick={() => handleUpdateStatus(req.studentId, 'Cleared')}>
+          <button onClick={() => handleUpdateStatus(req.studentId, 'cleared')}>
             Approve
           </button>
-          <button onClick={() => handleUpdateStatus(req.studentId, 'Rejected', 'Missing docs')}>
+          <button onClick={() => handleUpdateStatus(req.studentId, 'rejected', 'Missing docs')}>
             Reject
           </button>
         </div>

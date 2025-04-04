@@ -489,7 +489,6 @@ router.post('/request-clearance', authMiddleware, async (req, res) => {
       return res.status(400).json({ message: 'Clearance already requested' });
     }
 
-    // Check if all payable obligations are resolved
     for (const [_, obligations] of clearance.departments) {
       if (obligations.some(obl => !obl.resolved && obl.amount > 0)) {
         return res.status(400).json({ message: 'Resolve all outstanding payments first' });
@@ -497,18 +496,16 @@ router.post('/request-clearance', authMiddleware, async (req, res) => {
     }
 
     clearance.clearanceRequested = true;
+    clearance.departmentStatus.forEach((_, dept) => clearance.departmentStatus.set(dept, 'pending'));
     await clearance.save();
 
-    // Simulate sending notifications (expand with real logic later)
     console.log(`Notification: Clearance request initiated for ${studentId}`);
-
     res.json({ message: 'Clearance requested', clearance });
   } catch (error) {
     console.error('Error requesting clearance:', error);
     res.status(500).json({ message: 'Failed to request clearance' });
   }
 });
-
 
 router.get('/staff/requests', authMiddleware, async (req, res) => {
   if (req.user.role !== 'staff') return res.status(403).json({ message: 'Unauthorized' });
@@ -529,26 +526,34 @@ router.get('/staff/requests', authMiddleware, async (req, res) => {
 });
 
 router.post('/staff/update-clearance', authMiddleware, async (req, res) => {
-  console.log("Working")
   if (req.user.role !== 'staff') return res.status(403).json({ message: 'Unauthorized' });
   const { studentId, status, comment } = req.body;
+  console.log('Received update:', req.body);
+  if (!['pending', 'reviewing', 'cleared', 'rejected'].includes(status)) {
+    return res.status(400).json({ message: 'Invalid status' });
+  }
+
   try {
     const clearance = await Clearance.findOne({ studentId });
     if (!clearance) return res.status(404).json({ message: 'Clearance not found' });
 
     clearance.departmentStatus.set(req.user.department, status);
-    if (comment) clearance.comments = clearance.comments || new Map();
-    if (comment) clearance.comments.set(req.user.department, comment);
+    if (comment) {
+      clearance.comments = clearance.comments || new Map();
+      clearance.comments.set(req.user.department, comment);
+    }
 
     const allCleared = Array.from(clearance.departmentStatus.values()).every(s => s === 'cleared');
     clearance.overallStatus = allCleared ? 'cleared' : 'pending';
 
     await clearance.save();
 
-    // Simulate notification
     console.log(`Notification: ${req.user.department} updated ${studentId} to ${status}`);
+    if (allCleared) console.log(`Notification: ${studentId} fully cleared`);
+
     res.json({ message: 'Status updated', clearance });
   } catch (error) {
+    console.error('Error updating status:', error);
     res.status(500).json({ message: 'Failed to update status' });
   }
 });

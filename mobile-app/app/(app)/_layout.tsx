@@ -1,4 +1,5 @@
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
+import { createStackNavigator } from '@react-navigation/stack';
 import { Ionicons } from '@expo/vector-icons';
 import HomeScreen from './home';
 import QRScreen from './qr';
@@ -10,8 +11,21 @@ import { Redirect } from 'expo-router';
 
 import { useSession } from '../../ctx';
 import StatusScreen from './status';
+import PaymentMethodScreen from './PaymentMethodScreen';
+import PaymentReceiptScreen from './PaymentReceiptScreen';
 
 const Tab = createBottomTabNavigator();
+const Stack = createStackNavigator();
+
+const HomeStack = () => {
+  return (
+    <Stack.Navigator>
+      <Stack.Screen name="Home" component={HomeScreen} />
+      <Stack.Screen name="PaymentMethod" component={PaymentMethodScreen} />
+      <Stack.Screen name="PaymentReceipt" component={PaymentReceiptScreen} />
+    </Stack.Navigator>
+  );
+};
 
 function AppTabs() {
   return (
@@ -32,7 +46,7 @@ function AppTabs() {
         headerShown: false,
       })}
     >
-      <Tab.Screen name="Home" component={HomeScreen}  />
+      <Tab.Screen name="Home" component={HomeStack} />
       <Tab.Screen name="QR" component={QRScreen}  />
       <Tab.Screen name="Certificate" component={CertificateScreen}  />
       {/* <Tab.Screen name="Report" component={ReportScreen}  /> */}
@@ -41,7 +55,6 @@ function AppTabs() {
     </Tab.Navigator>
   );
 }
-
 
 export default function AppLayout() {
   const { session, isLoading } = useSession();
@@ -54,5 +67,5 @@ export default function AppLayout() {
     return <Redirect href="/landingpage" />;
   }
 
-    return <AppTabs />;
+  return <AppTabs />;
 }

@@ -4,12 +4,14 @@ import axios from 'axios';
 import { apiUrl } from '../../config';
 import { useSession } from '@/ctx';
 import { Ionicons } from '@expo/vector-icons';
+import { useNavigation } from '@react-navigation/native';
 
 export default function HomeScreen() {
   const [clearance, setClearance] = useState(null);
   const [error, setError] = useState(null);
   const [selectedDepartment, setSelectedDepartment] = useState(null);
   const { session } = useSession();
+  const navigation = useNavigation();
 
   useEffect(() => {
     const fetchClearance = async () => {
@@ -31,18 +33,8 @@ export default function HomeScreen() {
     fetchClearance();
   }, [session]);
 
-  const handlePay = async (department, index) => {
-    try {
-      const response = await axios.post(
-        `${apiUrl}/pay`,
-        { department, obligationIndex: index },
-        { headers: { Authorization: `Bearer ${session}` } }
-      );
-      setClearance(response.data.clearance);
-      setSelectedDepartment(null); // Reset selected department after payment
-    } catch (error) {
-      console.error('Error processing payment:', error);
-    }
+  const handlePay = async (department, obligations) => {
+    navigation.navigate('PaymentMethod', { department, obligations });
   };
 
   const handleRequestClearance = async () => {
@@ -78,6 +70,9 @@ export default function HomeScreen() {
       {selectedDepartment ? (
         <View>
           <Text style={styles.deptTitle}>{selectedDepartment.toUpperCase()}</Text>
+          <Text style={styles.totalText}>
+            Total: {clearance.departments[selectedDepartment].reduce((acc, curr) => acc + curr.amount, 0)}
+          </Text>
           {clearance.departments[selectedDepartment].length === 0 ? (
             <Text>No issues</Text>
           ) : (
@@ -86,12 +81,10 @@ export default function HomeScreen() {
                 <Text>{obl.description}</Text>
                 <Text>Amount: {obl.amount}</Text>
                 <Text>Status: {obl.resolved ? 'Resolved' : 'Pending'}</Text>
-                {!obl.resolved && obl.amount > 0 && (
-                  <Button title="Pay Now" onPress={() => handlePay(selectedDepartment, index)} />
-                )}
               </View>
             ))
           )}
+          <Button title="Payment Method" onPress={() => handlePay(selectedDepartment, clearance.departments[selectedDepartment])} />
           <Button title="Back" onPress={() => setSelectedDepartment(null)} />
         </View>
       ) : (
@@ -138,4 +131,5 @@ const styles = StyleSheet.create({
   overall: { fontSize: 18, marginTop: 20, marginBottom: 20, textAlign: 'center' },
   error: { fontSize: 16, color: 'red', textAlign: 'center', padding: 20 },
   deptTitle: { fontSize: 18, fontWeight: 'bold', marginBottom: 10 },
+  totalText: { fontSize: 16, fontWeight: 'bold', marginBottom: 10 },
 });

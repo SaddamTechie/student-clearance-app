@@ -26,8 +26,19 @@ export default function HomeScreen() {
         setClearance(response.data);
         setError(null);
       } catch (error) {
-        console.error('Error fetching clearance:', error);
-        setError(error.response?.data?.message || 'Failed to fetch clearance data');
+        if (axios.isAxiosError(error)) {
+          if (error.response) {
+            if (error.response.status === 401) {
+              setError('Session expired. Please log in again.');
+            } else {
+              setError(error.response.data?.message || 'Failed to fetch clearance data');
+            }
+          } else {
+            setError('Network error');
+          }
+        } else {
+          setError('An unknown error occurred');
+        }
       }
     };
     fetchClearance();
@@ -53,23 +64,47 @@ export default function HomeScreen() {
       );
       setClearance(response.data.clearance);
     } catch (error) {
-      console.error('Error requesting clearance:', error);
-      setError(error.response?.data?.message || 'Failed to request clearance');
+      if (axios.isAxiosError(error)) {
+        if (error.response) {
+          setError(error.response.data?.message || 'Failed to request clearance');
+        } else {
+          setError('Network error');
+        }
+      } else {
+        setError('An unknown error occurred');
+      }
     }
   };
 
-  if (error) return (
-    <View style={styles.errorContainer}>
-      <Text style={styles.errorText}>{error}</Text>
-      <Ionicons name="alert-circle" size={24} color="#FF9933" />
-    </View>
-  );
-  if (!clearance) return (
-    <View style={styles.loadingContainer}>
-      <Text>Loading...</Text>
-      <Ionicons name="sync-circle" size={24} color="#7ABB3B" />
-    </View>
-  );
+  if (error) {
+    return (
+      <View style={styles.errorContainer}>
+        <Text style={styles.errorTitle}>Error</Text>
+        <Text style={styles.errorText}>{error}</Text>
+        <Ionicons name="alert-circle" size={24} color="#FF9933" />
+        <Button title="Retry" onPress={() => setError(null)} />
+      </View>
+    );
+  }
+
+  if (!clearance) {
+    return (
+      <View style={styles.loadingContainer}>
+        <Ionicons name="sync-circle" size={48} color="#7ABB3B" />
+        <Text style={styles.loadingText}>Loading...</Text>
+      </View>
+    );
+  }
+
+  if (!clearance.departments) {
+    return (
+      <View style={styles.errorContainer}>
+        <Text style={styles.errorTitle}>Error</Text>
+        <Text style={styles.errorText}>Invalid clearance data.</Text>
+        <Ionicons name="alert-circle" size={24} color="#FF9933" />
+      </View>
+    );
+  }
 
   const canRequestClearance = !clearance.clearanceRequested && 
     !Object.values(clearance.departments).some(dept => 
@@ -149,8 +184,10 @@ const styles = StyleSheet.create({
   obligation: { borderWidth: 1, padding: 10, marginVertical: 5 },
   overall: { fontSize: 18, marginTop: 20, marginBottom: 20, textAlign: 'center' },
   errorContainer: { flex: 1, justifyContent: 'center', alignItems: 'center' },
-  errorText: { fontSize: 16, color: 'red', marginBottom: 10 },
+  errorTitle: { fontSize: 24, color: '#FF9933', marginBottom: 10 },
+  errorText: { fontSize: 16, color: '#666', marginBottom: 20 },
   loadingContainer: { flex: 1, justifyContent: 'center', alignItems: 'center' },
+  loadingText: { fontSize: 18, color: '#666', marginTop: 20 },
   requestButton: { backgroundColor: '#7ABB3B', padding: 10, borderRadius: 5 },
   deptTitle: { fontSize: 18, fontWeight: 'bold', marginBottom: 10 },
   totalText: { fontSize: 16, fontWeight: 'bold', marginBottom: 10 },

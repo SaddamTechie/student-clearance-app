@@ -46,7 +46,7 @@ function AppTabs() {
         headerShown: false,
       })}
     >
-      <Tab.Screen name="Home" component={HomeStack} />
+      <Tab.Screen name="HomeTab" component={HomeStack} />
       <Tab.Screen name="QR" component={QRScreen}  />
       <Tab.Screen name="Certificate" component={CertificateScreen}  />
       {/* <Tab.Screen name="Report" component={ReportScreen}  /> */}

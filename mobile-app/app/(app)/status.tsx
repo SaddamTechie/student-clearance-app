@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, ScrollView } from 'react-native';
+import { View, Text, Button, StyleSheet, ScrollView } from 'react-native';
 import axios from 'axios';
 import { apiUrl } from '../../config';
 import { useSession } from '@/ctx';
@@ -24,20 +24,52 @@ export default function StatusScreen() {
         setClearance(response.data);
         setError(null);
       } catch (error) {
-        console.error('Error fetching clearance:', error);
-        setError(error.response?.data?.message || 'Failed to fetch clearance data');
+        if (axios.isAxiosError(error)) {
+          if (error.response) {
+            if (error.response.status === 401) {
+              setError('Session expired. Please log in again.');
+            } else {
+              setError(error.response.data?.message || 'Failed to fetch clearance data');
+            }
+          } else {
+            setError('Network error');
+          }
+        } else {
+          setError('An unknown error occurred');
+        }
       }
     };
     fetchClearance();
   }, [session]);
 
   if (error) {
-    console.log('Rendering error:', error);
-    return <Text style={styles.error}>{error}</Text>;
+    return (
+      <View style={styles.errorContainer}>
+        <Text style={styles.errorTitle}>Error</Text>
+        <Text style={styles.errorText}>{error}</Text>
+        <Ionicons name="alert-circle" size={24} color="#FF9933" />
+        <Button title="Retry" onPress={() => setError(null)} />
+      </View>
+    );
   }
+
   if (!clearance) {
-    console.log('Clearance not loaded yet');
-    return <Text>Loading...</Text>;
+    return (
+      <View style={styles.loadingContainer}>
+        <Ionicons name="sync-circle" size={48} color="#7ABB3B" />
+        <Text style={styles.loadingText}>Loading...</Text>
+      </View>
+    );
+  }
+
+  if (!clearance.departmentStatus) {
+    return (
+      <View style={styles.errorContainer}>
+        <Text style={styles.errorTitle}>Error</Text>
+        <Text style={styles.errorText}>Invalid clearance data.</Text>
+        <Ionicons name="alert-circle" size={24} color="#FF9933" />
+      </View>
+    );
   }
 
   const getStatusIcon = (status) => {
@@ -53,8 +85,6 @@ export default function StatusScreen() {
         return { name: 'ellipse-outline', color: '#6c757d' };
     }
   };
-
-  console.log('Rendering with clearanceRequested:', clearance.clearanceRequested);
 
   const departmentStatuses = Object.entries(clearance.departmentStatus);
   const total = departmentStatuses.length;
@@ -77,7 +107,6 @@ export default function StatusScreen() {
             </View>
           </View>
           {departmentStatuses.map(([dept, status]) => {
-            console.log(`Rendering department: ${dept}, status: ${status}`);
             const { name, color } = getStatusIcon(status);
             return (
               <View key={dept} style={styles.statusItem}>
@@ -128,5 +157,10 @@ const styles = StyleSheet.create({
   deptText: { fontSize: 18, fontWeight: 'bold' },
   statusText: { fontSize: 16, fontWeight: '500', marginTop: 2 },
   overall: { fontSize: 20, fontWeight: 'bold', textAlign: 'center', marginTop: 20 },
+  errorContainer: { flex: 1, justifyContent: 'center', alignItems: 'center' },
+  errorTitle: { fontSize: 24, color: '#FF9933', marginBottom: 10 },
+  errorText: { fontSize: 16, color: '#666', marginBottom: 20 },
+  loadingContainer: { flex: 1, justifyContent: 'center', alignItems: 'center' },
+  loadingText: { fontSize: 18, color: '#666', marginTop: 20 },
   error: { fontSize: 16, color: 'red', textAlign: 'center', padding: 20 },
 });

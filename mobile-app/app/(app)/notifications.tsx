@@ -28,30 +28,17 @@ export default function NotificationsScreen() {
     fetchNotifications();
 
     // Setup Socket.IO
-    const socket = io('http://localhost:5000', { transports: ['websocket'] }); // Force websocket
+    const socket = io('http://localhost:5000', { transports: ['websocket'] });
     socket.on('connect', () => {
-      console.log('Socket connected:', socket.id);
-      const userId = JSON.parse(atob(session.split('.')[1])).id; // Decode JWT payload
+      const userId = JSON.parse(atob(session.split('.')[1])).id;
       socket.emit('join', userId);
-      console.log('Joined room:', userId);
     });
     socket.on('notification', (notification) => {
-      console.log('Received notification:', notification);
       setNotifications((prev) => [notification, ...prev]);
     });
-    socket.on('connect_error', (err) => {
-      console.error('Socket connection error:', err.message);
-      setError('Failed to connect to notification server');
-    });
-    socket.on('error', (err) => {
-      console.error('Socket error:', err.message);
-      setError(err.message);
-    });
+    socket.on('error', (err) => setError(err.message));
 
-    return () => {
-      console.log('Disconnecting socket');
-      socket.disconnect();
-    };
+    return () => socket.disconnect();
   }, [session]);
 
   const markAsRead = async (id) => {
@@ -69,8 +56,6 @@ export default function NotificationsScreen() {
 
   if (error) return <Text style={styles.error}>{error}</Text>;
   if (!notifications) return <Text>Loading...</Text>;
-
-  const unreadCount = notifications.filter((n) => !n.read).length;
 
   return (
     <ScrollView style={styles.container}>
@@ -103,36 +88,8 @@ export default function NotificationsScreen() {
   );
 }
 
-NotificationsScreen.tabBarIcon = ({ color, size }) => {
-  const { session } = useSession();
-  const [unreadCount, setUnreadCount] = useState(0);
-
-  useEffect(() => {
-    if (!session) return;
-    const fetchUnread = async () => {
-      try {
-        const response = await axios.get(`${apiUrl}/notifications`, {
-          headers: { Authorization: `Bearer ${session}` },
-        });
-        setUnreadCount(response.data.filter((n) => !n.read).length);
-      } catch (err) {
-        console.error('Error fetching unread count:', err);
-      }
-    };
-    fetchUnread();
-  }, [session]);
-
-  return (
-    <View>
-      <Ionicons name="notifications" size={size} color={color} />
-      {unreadCount > 0 && (
-        <View style={styles.badge}>
-          <Text style={styles.badgeText}>{unreadCount}</Text>
-        </View>
-      )}
-    </View>
-  );
-};
+// Remove tabBarIcon from here since it's handled in _layout.tsx
+NotificationsScreen.tabBarIcon = undefined;
 
 const styles = StyleSheet.create({
   container: { flex: 1, padding: 20, backgroundColor: '#f5f5f5' },
@@ -151,17 +108,5 @@ const styles = StyleSheet.create({
   textContainer: { flex: 1 },
   message: { fontSize: 16, fontWeight: '500' },
   date: { fontSize: 12, color: '#666', marginTop: 5 },
-  badge: {
-    position: 'absolute',
-    right: -6,
-    top: -3,
-    backgroundColor: 'red',
-    borderRadius: 10,
-    width: 20,
-    height: 20,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  badgeText: { color: '#fff', fontSize: 12 },
   error: { fontSize: 16, color: 'red', textAlign: 'center', padding: 20 },
 });

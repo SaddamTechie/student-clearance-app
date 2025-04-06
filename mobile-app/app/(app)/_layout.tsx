@@ -13,6 +13,7 @@ import { useSession } from '../../ctx';
 import StatusScreen from './status';
 import PaymentMethodScreen from './PaymentMethodScreen';
 import PaymentReceiptScreen from './PaymentReceiptScreen';
+import NotificationsScreen from './notifications';
 
 const Tab = createBottomTabNavigator();
 const Stack = createStackNavigator();
@@ -35,9 +36,10 @@ function AppTabs() {
           let iconName;
           if (route.name === 'Home') iconName = 'home';
           else if (route.name === 'QR') iconName = 'qr-code';
-          else if (route.name === 'Certificate') iconName = 'document';
+          //else if (route.name === 'Certificate') iconName = 'document';
           // else if (route.name === 'Report') iconName = 'alert';
           else if (route.name === 'Status') iconName = 'alert';
+          else if (route.name === 'Notifications') iconName = 'notifications';
           else if (route.name === 'Profile') iconName = 'person'; // Profile icon
           return <Ionicons name={iconName} size={size} color={color} />;
         },
@@ -47,10 +49,12 @@ function AppTabs() {
       })}
     >
       <Tab.Screen name="HomeTab" component={HomeStack} />
-      <Tab.Screen name="QR" component={QRScreen}  />
-      <Tab.Screen name="Certificate" component={CertificateScreen}  />
-      {/* <Tab.Screen name="Report" component={ReportScreen}  /> */}
       <Tab.Screen name="Status" component={StatusScreen}  />
+      <Tab.Screen name="Notifications" component={NotificationsScreen}  />
+      <Tab.Screen name="QR" component={QRScreen}  />
+      {/* <Tab.Screen name="Certificate" component={CertificateScreen}  /> */}
+      {/* <Tab.Screen name="Report" component={ReportScreen}  /> */}
+      
       <Tab.Screen name="Profile" component={ProfileScreen}  />
     </Tab.Navigator>
   );

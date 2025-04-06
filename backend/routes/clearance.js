@@ -4,6 +4,7 @@ const Student = require('../models/Student');
 const Staff = require('../models/Staff');
 const Report = require('../models/Report');
 const Request = require('../models/Request');
+const Notification = require('../models/Notification');
 const Clearance = require('../models/Clearance')
 const qrcode = require('qrcode');
 const { sendEmail } = require('../utils/notifications');
@@ -37,6 +38,16 @@ const roleMiddleware = (roles) => (req, res, next) => {
   }
   next();
 };
+
+// Helper function to send notifications
+const sendNotification = async (io, userId, message, type = 'clearance') => {
+  const notification = new Notification({ userId, message, type });
+  await notification.save();
+  // console.log(`Emitting notification to ${userId}:`, notification);
+  io.to(userId).emit('notification', notification);
+  //console.log(`Notification sent to ${userId}: ${message}`);
+};
+
 
 // Unified Login
 router.post('/login', async (req, res) => {
@@ -420,11 +431,13 @@ router.post('/pay', authMiddleware, async (req, res) => {
 
 
 
+// Update /request-clearance
 router.post('/request-clearance', authMiddleware, async (req, res) => {
   if (req.user.role !== 'student') {
     return res.status(403).json({ message: 'Unauthorized' });
   }
   const studentId = req.user.id;
+  const io = req.app.get('io');
 
   try {
     const clearance = await Clearance.findOne({ studentId });
@@ -443,7 +456,16 @@ router.post('/request-clearance', authMiddleware, async (req, res) => {
     clearance.departmentStatus.forEach((_, dept) => clearance.departmentStatus.set(dept, 'pending'));
     await clearance.save();
 
-    console.log(`Notification: Clearance request initiated for ${studentId}`);
+    // Notify student
+    await sendNotification(io, studentId, 'Your clearance request has been initiated.');
+
+    // Notify staff in each department
+    const departments = ['finance', 'library', 'academic', 'hostel'];
+    const staff = await Staff.find({ department: { $in: departments } });
+    staff.forEach(async (s) => {
+      await sendNotification(io, s._id.toString(), `New clearance request from ${studentId} for ${s.department}.`);
+    });
+
     res.json({ message: 'Clearance requested', clearance });
   } catch (error) {
     console.error('Error requesting clearance:', error);
@@ -451,28 +473,12 @@ router.post('/request-clearance', authMiddleware, async (req, res) => {
   }
 });
 
-router.get('/staff/requests', authMiddleware, async (req, res) => {
-  if (req.user.role !== 'staff') return res.status(403).json({ message: 'Unauthorized' });
-  try {
-    const clearances = await Clearance.find({ 
-      clearanceRequested: true, 
-      [`departmentStatus.${req.user.department}`]: 'pending' 
-    });
-    const requests = clearances.map(c => ({
-      studentId: c.studentId,
-      status: c.departmentStatus.get(req.user.department),
-      obligations: (c.departments.get(req.user.department) || []).map(o => o.description),
-    }));
-    res.json(requests);
-  } catch (error) {
-    res.status(500).json({ message: 'Failed to fetch requests' });
-  }
-});
-
+// Update /staff/update-clearance
 router.post('/staff/update-clearance', authMiddleware, async (req, res) => {
   if (req.user.role !== 'staff') return res.status(403).json({ message: 'Unauthorized' });
   const { studentId, status, comment } = req.body;
-  console.log('Received update:', req.body);
+  const io = req.app.get('io');
+
   if (!['pending', 'reviewing', 'cleared', 'rejected'].includes(status)) {
     return res.status(400).json({ message: 'Invalid status' });
   }
@@ -492,8 +498,21 @@ router.post('/staff/update-clearance', authMiddleware, async (req, res) => {
 
     await clearance.save();
 
-    console.log(`Notification: ${req.user.department} updated ${studentId} to ${status}`);
-    if (allCleared) console.log(`Notification: ${studentId} fully cleared`);
+    // Notify student
+    await sendNotification(
+      io,
+      studentId,
+      `${req.user.department} updated your clearance to ${status}${comment ? `: ${comment}` : ''}`
+    );
+
+    // Notify staff if fully cleared
+    if (allCleared) {
+      await sendNotification(io, studentId, 'Your clearance is fully approved!');
+      const staff = await Staff.find({});
+      staff.forEach(async (s) => {
+        await sendNotification(io, s._id.toString(), `${studentId} is fully cleared.`);
+      });
+    }
 
     res.json({ message: 'Status updated', clearance });
   } catch (error) {
@@ -501,6 +520,83 @@ router.post('/staff/update-clearance', authMiddleware, async (req, res) => {
     res.status(500).json({ message: 'Failed to update status' });
   }
 });
+
+// New endpoint to get notifications
+router.get('/notifications', authMiddleware, async (req, res) => {
+  try {
+    const notifications = await Notification.find({ userId: req.user.id }).sort({ createdAt: -1 });
+    res.json(notifications);
+  } catch (error) {
+    console.error('Error fetching notifications:', error);
+    res.status(500).json({ message: 'Failed to fetch notifications' });
+  }
+});
+
+// Mark notification as read
+router.patch('/notifications/:id/read', authMiddleware, async (req, res) => {
+  try {
+    const notification = await Notification.findOne({ _id: req.params.id, userId: req.user.id });
+    if (!notification) return res.status(404).json({ message: 'Notification not found' });
+    notification.read = true;
+    await notification.save();
+    res.json({ message: 'Notification marked as read', notification });
+  } catch (error) {
+    console.error('Error marking notification as read:', error);
+    res.status(500).json({ message: 'Failed to mark notification as read' });
+  }
+});
+
+
+router.get('/staff/requests', authMiddleware, async (req, res) => {
+  if (req.user.role !== 'staff') return res.status(403).json({ message: 'Unauthorized' });
+  try {
+    const clearances = await Clearance.find({ 
+      clearanceRequested: true, 
+      [`departmentStatus.${req.user.department}`]: 'pending' 
+    });
+    const requests = clearances.map(c => ({
+      studentId: c.studentId,
+      status: c.departmentStatus.get(req.user.department),
+      obligations: (c.departments.get(req.user.department) || []).map(o => o.description),
+    }));
+    res.json(requests);
+  } catch (error) {
+    res.status(500).json({ message: 'Failed to fetch requests' });
+  }
+});
+
+// router.post('/staff/update-clearance', authMiddleware, async (req, res) => {
+//   if (req.user.role !== 'staff') return res.status(403).json({ message: 'Unauthorized' });
+//   const { studentId, status, comment } = req.body;
+//   console.log('Received update:', req.body);
+//   if (!['pending', 'reviewing', 'cleared', 'rejected'].includes(status)) {
+//     return res.status(400).json({ message: 'Invalid status' });
+//   }
+
+//   try {
+//     const clearance = await Clearance.findOne({ studentId });
+//     if (!clearance) return res.status(404).json({ message: 'Clearance not found' });
+
+//     clearance.departmentStatus.set(req.user.department, status);
+//     if (comment) {
+//       clearance.comments = clearance.comments || new Map();
+//       clearance.comments.set(req.user.department, comment);
+//     }
+
+//     const allCleared = Array.from(clearance.departmentStatus.values()).every(s => s === 'cleared');
+//     clearance.overallStatus = allCleared ? 'cleared' : 'pending';
+
+//     await clearance.save();
+
+//     console.log(`Notification: ${req.user.department} updated ${studentId} to ${status}`);
+//     if (allCleared) console.log(`Notification: ${studentId} fully cleared`);
+
+//     res.json({ message: 'Status updated', clearance });
+//   } catch (error) {
+//     console.error('Error updating status:', error);
+//     res.status(500).json({ message: 'Failed to update status' });
+//   }
+// });
 
 
 

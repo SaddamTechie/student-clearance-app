@@ -2,10 +2,14 @@ import React, { useState } from 'react';
 import { View, Text, Button, StyleSheet } from 'react-native';
 import { useNavigation, useRoute } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
+import { apiUrl } from '../../config';
+import axios from 'axios';
+import { useSession } from '@/ctx';
 
 export default function PaymentMethodScreen() {
   const navigation = useNavigation();
   const route = useRoute();
+  const { session } = useSession();
   const { department, obligations } = route.params;
 
   const unresolvedObligations = obligations.filter(obl => !obl.resolved && obl.amount > 0);

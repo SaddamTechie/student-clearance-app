@@ -10,7 +10,7 @@ export default function HomeScreen() {
   const [clearance, setClearance] = useState(null);
   const [error, setError] = useState(null);
   const [selectedDepartment, setSelectedDepartment] = useState(null);
-  const { session } = useSession();
+  const { session,signOut } = useSession();
   const navigation = useNavigation();
 
   useEffect(() => {
@@ -30,6 +30,7 @@ export default function HomeScreen() {
           if (error.response) {
             if (error.response.status === 401) {
               setError('Session expired. Please log in again.');
+              signOut();
             } else {
               setError(error.response.data?.message || 'Failed to fetch clearance data');
             }

@@ -16,7 +16,8 @@ import StatusScreen from './status';
 import PaymentMethodScreen from './PaymentMethodScreen';
 import PaymentReceiptScreen from './PaymentReceiptScreen';
 import NotificationsScreen from './notifications';
-import { apiUrl } from '../../config';
+import { apiUrl,socketUrl } from '../../config';
+
 
 const Tab = createBottomTabNavigator();
 const Stack = createStackNavigator();
@@ -53,7 +54,7 @@ function AppTabs() {
     fetchUnreadCount();
 
     // Setup Socket.IO for real-time updates
-    const socket = io('http://localhost:5000', { transports: ['websocket'] }); // Adjust URL
+    const socket = io(`${socketUrl}`, { transports: ['websocket'] }); // Adjust URL
     socket.on('connect', () => {
       const userId = JSON.parse(atob(session.split('.')[1])).id;
       socket.emit('join', userId);

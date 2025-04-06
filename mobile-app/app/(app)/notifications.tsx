@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { View, Text, StyleSheet, ScrollView, TouchableOpacity } from 'react-native';
 import axios from 'axios';
-import { apiUrl } from '../../config';
+import { apiUrl,socketUrl } from '../../config';
 import { useSession } from '@/ctx';
 import { Ionicons } from '@expo/vector-icons';
 import io from 'socket.io-client';
@@ -28,7 +28,7 @@ export default function NotificationsScreen() {
     fetchNotifications();
 
     // Setup Socket.IO
-    const socket = io('http://localhost:5000', { transports: ['websocket'] });
+    const socket = io(`${socketUrl}`, { transports: ['websocket'] });
     socket.on('connect', () => {
       const userId = JSON.parse(atob(session.split('.')[1])).id;
       socket.emit('join', userId);

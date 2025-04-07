@@ -78,6 +78,40 @@ router.post('/login', async (req, res) => {
 });
 
 
+// Get current user info
+router.get('/me', authMiddleware, async (req, res) => {
+  try {
+    const token = req.header('Authorization').replace('Bearer ', '');
+    const decoded = require('jsonwebtoken').verify(token, process.env.SECRET_KEY);
+    const userId = decoded.id;
+    const role = decoded.role;
+
+    let user;
+    if (role === 'student') {
+      user = await Student.findOne({ studentId: userId }).select('-password');
+      if (!user) return res.status(404).json({ message: 'Student not found' });
+    } else if (role === 'staff' || role === 'admin') {
+      user = await Staff.findById(userId).select('-password');
+      if (!user) return res.status(404).json({ message: 'Staff not found' });
+    } else {
+      return res.status(400).json({ message: 'Invalid user role' });
+    }
+
+    res.json({
+      email: user.email,
+      role: role,
+      department: user.department || null, // Staff only
+      name: user.name || null, // Students might have name
+      studentId: user.studentId || null, // Students only
+      createdAt: user.createdAt,
+    });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ message: 'Server error', error: err.message });
+  }
+});
+
+
 
 
 const generateObligations = (studentId) => {
@@ -179,6 +213,32 @@ router.put('/staff/password', authMiddleware, roleMiddleware(['staff', 'admin'])
     res.status(500).json({ message: 'Server error', error: err.message });
   }
 });
+
+
+//Get staff
+router.get('/staff/list', authMiddleware, roleMiddleware(['admin']), async (req, res) => {
+  try {
+    const staff = await Staff.find({});
+    res.json(staff);
+  } catch (err) {
+    res.status(500).json({ message: 'Failed to fetch staff list', error: err.message });
+  }
+});
+
+
+
+//Delete Staff
+router.delete('/staff/:id', authMiddleware, roleMiddleware(['admin']), async (req, res) => {
+  try {
+    const staff = await Staff.findByIdAndDelete(req.params.id);
+    if (!staff) return res.status(404).json({ message: 'Staff not found' });
+    res.json({ message: 'Staff deleted successfully' });
+  } catch (err) {
+    res.status(500).json({ message: 'Failed to delete staff', error: err.message });
+  }
+});
+
+
 
 // Submit Clearance Request (Student Only)
 router.post('/request', authMiddleware, roleMiddleware(['student']), async (req, res) => {

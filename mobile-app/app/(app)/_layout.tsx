@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React from 'react';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { createStackNavigator } from '@react-navigation/stack';
 import { Ionicons } from '@expo/vector-icons';
@@ -6,6 +6,7 @@ import { View, Text, StyleSheet } from 'react-native';
 import { Redirect } from 'expo-router';
 import { useSession } from '../../ctx';
 import io from 'socket.io-client';
+import { NotificationsProvider,useNotificationsContext } from '../../notificationContext';
 
 import HomeScreen from './home';
 import QRScreen from './qr';
@@ -16,8 +17,7 @@ import StatusScreen from './status';
 import PaymentMethodScreen from './PaymentMethodScreen';
 import PaymentReceiptScreen from './PaymentReceiptScreen';
 import NotificationsScreen from './notifications';
-import { apiUrl,socketUrl } from '../../config';
-
+import { apiUrl, socketUrl } from '../../config';
 
 const Tab = createBottomTabNavigator();
 const Stack = createStackNavigator();
@@ -34,42 +34,7 @@ const HomeStack = () => (
 // Bottom Tab Navigator
 function AppTabs() {
   const { session } = useSession();
-  const [unreadCount, setUnreadCount] = useState(0);
-
-  useEffect(() => {
-    if (!session) return;
-
-    // Fetch initial unread count
-    const fetchUnreadCount = async () => {
-      try {
-        const response = await fetch(`${apiUrl}/notifications`, {
-          headers: { Authorization: `Bearer ${session}` },
-        });
-        const data = await response.json();
-        setUnreadCount(data.filter((n) => !n.read).length);
-      } catch (err) {
-        console.error('Error fetching unread count:', err);
-      }
-    };
-    fetchUnreadCount();
-
-    // Setup Socket.IO for real-time updates
-    const socket = io(`${socketUrl}`, { transports: ['websocket'] }); // Adjust URL
-    socket.on('connect', () => {
-      const userId = JSON.parse(atob(session.split('.')[1])).id;
-      socket.emit('join', userId);
-      console.log('Socket joined room:', userId);
-    });
-    socket.on('notification', (notification) => {
-      console.log('New notification received:', notification);
-      if (!notification.read) {
-        setUnreadCount((prev) => prev + 1);
-      }
-    });
-    socket.on('connect_error', (err) => console.error('Socket error:', err));
-
-    return () => socket.disconnect();
-  }, [session]);
+  const { unreadCount } = useNotificationsContext();
 
   return (
     <Tab.Navigator
@@ -123,7 +88,11 @@ export default function AppLayout() {
     return <Redirect href="/landingpage" />;
   }
 
-  return <AppTabs />;
+  return (
+    <NotificationsProvider>
+      <AppTabs />
+    </NotificationsProvider>
+  );
 }
 
 const styles = StyleSheet.create({

@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, Button, StyleSheet, ScrollView, TouchableOpacity } from 'react-native';
+import { View, Text, Button, StyleSheet, ScrollView, TouchableOpacity, RefreshControl } from 'react-native';
 import axios from 'axios';
 import { apiUrl } from '../../config';
 import { useSession } from '@/ctx';
@@ -10,40 +10,55 @@ export default function HomeScreen() {
   const [clearance, setClearance] = useState(null);
   const [error, setError] = useState(null);
   const [selectedDepartment, setSelectedDepartment] = useState(null);
-  const { session,signOut } = useSession();
+  const { session, signOut } = useSession();
   const navigation = useNavigation();
+  const [refreshing, setRefreshing] = useState(false);
 
-  useEffect(() => {
-    const fetchClearance = async () => {
-      if (!session) {
-        setError('No session available');
-        return;
-      }
-      try {
-        const response = await axios.get(`${apiUrl}/status`, {
-          headers: { Authorization: `Bearer ${session}` },
-        });
-        setClearance(response.data);
-        setError(null);
-      } catch (error) {
-        if (axios.isAxiosError(error)) {
-          if (error.response) {
-            if (error.response.status === 401) {
-              setError('Session expired. Please log in again.');
-              signOut();
-            } else {
-              setError(error.response.data?.message || 'Failed to fetch clearance data');
-            }
+  // Function to fetch clearance data
+  const fetchClearance = async () => {
+    if (!session) {
+      setError('No session available');
+      return;
+    }
+    try {
+      const response = await axios.get(`${apiUrl}/status`, {
+        headers: { Authorization: `Bearer ${session}` },
+      });
+      setClearance(response.data);
+      setError(null);
+    } catch (error) {
+      if (axios.isAxiosError(error)) {
+        if (error.response) {
+          if (error.response.status === 401) {
+            setError('Session expired. Please log in again.');
+            signOut();
           } else {
-            setError('Network error');
+            setError(error.response.data?.message || 'Failed to fetch clearance data');
           }
         } else {
-          setError('An unknown error occurred');
+          setError('Network error');
         }
+      } else {
+        setError('An unknown error occurred');
       }
-    };
-    fetchClearance();
+    }
+  };
+
+  useEffect(() => {
+    fetchClearance(); // Initial fetch
+
+    // Poll for updates every 10 seconds
+    const intervalId = setInterval(fetchClearance, 10000);
+
+    // Clear the interval when the component unmounts
+    return () => clearInterval(intervalId);
   }, [session]);
+
+  const handleRefresh = async () => {
+    setRefreshing(true);
+    await fetchClearance();
+    setRefreshing(false);
+  };
 
   const handlePay = async (department, obligations) => {
     const unresolvedObligations = obligations.filter(obl => !obl.resolved && obl.amount > 0);
@@ -118,7 +133,12 @@ export default function HomeScreen() {
   });
 
   return (
-    <ScrollView style={styles.container}>
+    <ScrollView
+      style={styles.container}
+      refreshControl={
+        <RefreshControl refreshing={refreshing} onRefresh={handleRefresh} />
+      }
+    >
       <Text style={styles.title}>Clearance Status</Text>
       {selectedDepartment ? (
         <View>

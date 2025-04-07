@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, Button, StyleSheet, ScrollView } from 'react-native';
+import { View, Text, Button, StyleSheet, ScrollView, RefreshControl } from 'react-native';
 import axios from 'axios';
 import { apiUrl } from '../../config';
 import { useSession } from '@/ctx';
@@ -9,38 +9,53 @@ export default function StatusScreen() {
   const [clearance, setClearance] = useState(null);
   const [error, setError] = useState(null);
   const { session } = useSession();
+  const [refreshing, setRefreshing] = useState(false);
 
-  useEffect(() => {
-    const fetchClearance = async () => {
-      if (!session) {
-        setError('No session available');
-        return;
-      }
-      try {
-        const response = await axios.get(`${apiUrl}/status`, {
-          headers: { Authorization: `Bearer ${session}` },
-        });
-        console.log('Clearance data received:', JSON.stringify(response.data, null, 2));
-        setClearance(response.data);
-        setError(null);
-      } catch (error) {
-        if (axios.isAxiosError(error)) {
-          if (error.response) {
-            if (error.response.status === 401) {
-              setError('Session expired. Please log in again.');
-            } else {
-              setError(error.response.data?.message || 'Failed to fetch clearance data');
-            }
+  // Function to fetch clearance data
+  const fetchClearance = async () => {
+    if (!session) {
+      setError('No session available');
+      return;
+    }
+    try {
+      const response = await axios.get(`${apiUrl}/status`, {
+        headers: { Authorization: `Bearer ${session}` },
+      });
+      console.log('Clearance data received:', JSON.stringify(response.data, null, 2));
+      setClearance(response.data);
+      setError(null);
+    } catch (error) {
+      if (axios.isAxiosError(error)) {
+        if (error.response) {
+          if (error.response.status === 401) {
+            setError('Session expired. Please log in again.');
           } else {
-            setError('Network error');
+            setError(error.response.data?.message || 'Failed to fetch clearance data');
           }
         } else {
-          setError('An unknown error occurred');
+          setError('Network error');
         }
+      } else {
+        setError('An unknown error occurred');
       }
-    };
-    fetchClearance();
+    }
+  };
+
+  useEffect(() => {
+    fetchClearance(); // Initial fetch
+
+    // Poll for updates every 10 seconds
+    const intervalId = setInterval(fetchClearance, 10000);
+
+    // Clear the interval when the component unmounts
+    return () => clearInterval(intervalId);
   }, [session]);
+
+  const handleRefresh = async () => {
+    setRefreshing(true);
+    await fetchClearance();
+    setRefreshing(false);
+  };
 
   if (error) {
     return (
@@ -92,7 +107,12 @@ export default function StatusScreen() {
   const progressPercentage = total > 0 ? (clearedCount / total) * 100 : 0;
 
   return (
-    <ScrollView style={styles.container}>
+    <ScrollView
+      style={styles.container}
+      refreshControl={
+        <RefreshControl refreshing={refreshing} onRefresh={handleRefresh} />
+      }
+    >
       <Text style={styles.title}>Clearance Status</Text>
       {!clearance.clearanceRequested ? (
         <Text style={styles.info}>Request clearance from the Home tab to start tracking.</Text>
@@ -162,5 +182,4 @@ const styles = StyleSheet.create({
   errorText: { fontSize: 16, color: '#666', marginBottom: 20 },
   loadingContainer: { flex: 1, justifyContent: 'center', alignItems: 'center' },
   loadingText: { fontSize: 18, color: '#666', marginTop: 20 },
-  error: { fontSize: 16, color: 'red', textAlign: 'center', padding: 20 },
 });

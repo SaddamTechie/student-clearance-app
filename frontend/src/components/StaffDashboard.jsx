@@ -4,12 +4,12 @@ import axios from 'axios';
 const StaffDashboard = () => {
   const [requests, setRequests] = useState([]);
   const [error, setError] = useState(null);
-  const API_URL = 'http://localhost:5000'
+  const API_URL = import.meta.env.VITE_API_URL
 
   useEffect(() => {
     const fetchRequests = async () => {
       try {
-        const response = await axios.get(`${API_URL}/api/clearance/staff/requests`, {
+        const response = await axios.get(`${API_URL}/staff/requests`, {
           headers: { Authorization: `Bearer ${localStorage.getItem('authToken')}` },
         });
         setRequests(response.data);
@@ -23,7 +23,7 @@ const StaffDashboard = () => {
   const handleUpdateStatus = async (studentId, status, comment = '') => {
     try {
       const response = await axios.post(
-        `${API_URL}/api/clearance/staff/update-clearance`,
+        `${API_URL}/staff/update-clearance`,
         { studentId, status, comment },
         { headers: { Authorization: `Bearer ${localStorage.getItem('authToken')}` } }
       );

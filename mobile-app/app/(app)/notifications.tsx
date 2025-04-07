@@ -1,15 +1,18 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, RefreshControl } from 'react-native';
 import axios from 'axios';
-import { apiUrl,socketUrl } from '../../config';
+import { apiUrl, socketUrl } from '../../config';
 import { useSession } from '@/ctx';
 import { Ionicons } from '@expo/vector-icons';
 import io from 'socket.io-client';
+import { useNotificationsContext } from '../../notificationContext';
 
 export default function NotificationsScreen() {
+  const { updateUnreadCount } = useNotificationsContext();
   const [notifications, setNotifications] = useState([]);
   const [error, setError] = useState(null);
   const { session } = useSession();
+  const [refreshing, setRefreshing] = useState(false);
 
   useEffect(() => {
     if (!session) return;
@@ -49,17 +52,40 @@ export default function NotificationsScreen() {
       setNotifications((prev) =>
         prev.map((n) => (n._id === id ? { ...n, read: true } : n))
       );
+      updateUnreadCount((prev) => prev - 1); // Update unread count
     } catch (err) {
       console.error('Error marking as read:', err);
     }
   };
 
+  const handleRefresh = async () => {
+    setRefreshing(true);
+    try {
+      const response = await axios.get(`${apiUrl}/notifications`, {
+        headers: { Authorization: `Bearer ${session}` },
+      });
+      setNotifications(response.data);
+      setError(null);
+      updateUnreadCount(response.data.filter((n) => !n.read).length); // Update unread count on refresh
+    } catch (err) {
+      setError(err.response?.data?.message || 'Failed to fetch notifications');
+    }
+    setRefreshing(false);
+  };
+
   if (error) return <Text style={styles.error}>{error}</Text>;
   if (!notifications) return <Text>Loading...</Text>;
 
+  const unreadCount = notifications.filter((n) => !n.read).length;
+
   return (
-    <ScrollView style={styles.container}>
-      <Text style={styles.title}>Notifications</Text>
+    <ScrollView
+      style={styles.container}
+      refreshControl={
+        <RefreshControl refreshing={refreshing} onRefresh={handleRefresh} />
+      }
+    >
+      <Text style={styles.title}>Notifications ({unreadCount} unread)</Text>
       {notifications.length === 0 ? (
         <Text style={styles.info}>No notifications yet.</Text>
       ) : (
@@ -87,9 +113,6 @@ export default function NotificationsScreen() {
     </ScrollView>
   );
 }
-
-// Remove tabBarIcon from here since it's handled in _layout.tsx
-NotificationsScreen.tabBarIcon = undefined;
 
 const styles = StyleSheet.create({
   container: { flex: 1, padding: 20, backgroundColor: '#f5f5f5' },

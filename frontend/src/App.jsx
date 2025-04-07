@@ -8,7 +8,7 @@ import ReportList from './components/ReportList';
 import QRScanner from './components/QRScanner';
 import StaffDashboard from './components/StaffDashboard';
 
-const apiUrl = 'http://localhost:5000/api/clearance';
+const apiUrl = import.meta.env.VITE_API_URL //|| 'https://student-clearance-app.onrender.com/api/clearance';
 
 function App() {
   const [isAuthenticated, setIsAuthenticated] = useState(false);

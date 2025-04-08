@@ -1,33 +1,14 @@
-import React, { useState, useEffect, useRef } from 'react';
-import {
-  View,
-  Text,
-  StyleSheet,
-  ScrollView,
-  TouchableOpacity,
-  RefreshControl,
-  Alert,
-  Platform,
-} from 'react-native';
+import React, { useState, useEffect } from 'react';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, RefreshControl, Alert } from 'react-native';
 import axios from 'axios';
 import { apiUrl, socketUrl } from '../../config';
 import { useSession } from '@/ctx';
 import { Ionicons } from '@expo/vector-icons';
 import io from 'socket.io-client';
 import { useNotificationsContext } from '../../notificationContext';
-import * as Notifications from 'expo-notifications';
-import * as Device from 'expo-device';
 
 const primaryColor = '#7ABB3B';
 const secondaryColor = '#FF9933';
-
-Notifications.setNotificationHandler({
-  handleNotification: async () => ({
-    shouldShowAlert: true,
-    shouldPlaySound: true,
-    shouldSetBadge: true,
-  }),
-});
 
 export default function NotificationsScreen() {
   const { updateUnreadCount } = useNotificationsContext();
@@ -35,53 +16,6 @@ export default function NotificationsScreen() {
   const [error, setError] = useState(null);
   const { session } = useSession();
   const [refreshing, setRefreshing] = useState(false);
-  const notificationListener = useRef();
-  const responseListener = useRef();
-
-  useEffect(() => {
-    const registerForPushNotifications = async () => {
-      if (Device.isDevice) {
-        const { status: existingStatus } = await Notifications.getPermissionsAsync();
-        let finalStatus = existingStatus;
-        if (existingStatus !== 'granted') {
-          const { status } = await Notifications.requestPermissionsAsync();
-          finalStatus = status;
-        }
-        if (finalStatus !== 'granted') {
-          Alert.alert('Permission Denied', 'Push notifications are disabled. Enable them in settings to receive updates.');
-        }
-        if (Platform.OS === 'android') {
-          Notifications.setNotificationChannelAsync('default', {
-            name: 'default',
-            importance: Notifications.AndroidImportance.MAX,
-            vibrationPattern: [0, 250, 250, 250],
-            lightColor: primaryColor,
-          });
-        }
-      } else {
-        console.log('Must use physical device for Push Notifications');
-      }
-    };
-
-    registerForPushNotifications();
-
-    notificationListener.current = Notifications.addNotificationReceivedListener((notification) => {
-      const { title, body } = notification.request.content;
-      setNotifications((prev) => [
-        { _id: Date.now().toString(), message: body, read: false, createdAt: new Date() },
-        ...prev,
-      ]);
-    });
-
-    responseListener.current = Notifications.addNotificationResponseReceivedListener((response) => {
-      console.log('Notification tapped:', response);
-    });
-
-    return () => {
-      Notifications.removeNotificationSubscription(notificationListener.current);
-      Notifications.removeNotificationSubscription(responseListener.current);
-    };
-  }, []);
 
   useEffect(() => {
     if (!session) return;
@@ -107,17 +41,9 @@ export default function NotificationsScreen() {
       const userId = JSON.parse(atob(session.split('.')[1])).id;
       socket.emit('join', userId);
     });
-    socket.on('notification', async (notification) => {
+    socket.on('notification', (notification) => {
       setNotifications((prev) => [notification, ...prev]);
       updateUnreadCount((prev) => prev + 1);
-      await Notifications.scheduleNotificationAsync({
-        content: {
-          title: 'New Notification',
-          body: notification.message,
-          data: { notificationId: notification._id },
-        },
-        trigger: null,
-      });
     });
     socket.on('error', (err) => {
       setError(err.message);

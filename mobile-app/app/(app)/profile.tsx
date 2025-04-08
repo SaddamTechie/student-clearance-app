@@ -18,6 +18,7 @@ import CertificateScreen from './certificate';
 import QRScreen from './qr';
 import ReportScreen from './report';
 import * as Notifications from 'expo-notifications';
+import * as Device from 'expo-device';
 
 const primaryColor = '#7ABB3B';
 const secondaryColor = '#FF9933';
@@ -54,6 +55,55 @@ export default function ProfileScreen() {
     }
   };
 
+  const savePushToken = async (token) => {
+    try {
+      await axios.post(
+        `${apiUrl}/save-push-token`,
+        { token },
+        { headers: { Authorization: `Bearer ${session}` } }
+      );
+      console.log('Push token saved successfully');
+    } catch (err) {
+      console.error('Failed to save push token:', err);
+      Alert.alert('Error', 'Could not save push notification token');
+      throw err; // Re-throw to handle in caller
+    }
+  };
+
+  const updateNotificationStatus = async (enabled) => {
+    if (!Device.isDevice) {
+      Alert.alert('Error', 'Push notifications require a physical device');
+      return;
+    }
+
+    try {
+      if (enabled) {
+        const { status } = await Notifications.requestPermissionsAsync();
+        if (status === 'granted') {
+          const token = (await Notifications.getExpoPushTokenAsync()).data;
+          await savePushToken(token);
+          setNotificationsEnabled(true);
+          Alert.alert('Success', 'Notifications enabled');
+        } else {
+          setNotificationsEnabled(false);
+          Alert.alert('Permission Denied', 'Notifications permission was not granted');
+        }
+      } else {
+        // Optionally clear the token on the backend if disabled
+        await axios.post(
+          `${apiUrl}/save-push-token`,
+          { token: null }, // Send null to clear token
+          { headers: { Authorization: `Bearer ${session}` } }
+        );
+        setNotificationsEnabled(false);
+        Alert.alert('Notifications', 'Notifications disabled');
+      }
+    } catch (err) {
+      console.error('Error updating notification status:', err);
+      setNotificationsEnabled(!enabled); // Revert on error
+    }
+  };
+
   useEffect(() => {
     fetchProfile();
     const checkNotificationStatus = async () => {
@@ -63,20 +113,8 @@ export default function ProfileScreen() {
     checkNotificationStatus();
   }, [session]);
 
-  const handleToggleNotifications = async (value) => {
-    if (value) {
-      const { status } = await Notifications.requestPermissionsAsync();
-      if (status === 'granted') {
-        setNotificationsEnabled(true);
-        Alert.alert('Success', 'Notifications enabled');
-      } else {
-        setNotificationsEnabled(false);
-        Alert.alert('Permission Denied', 'Notifications permission was not granted');
-      }
-    } else {
-      setNotificationsEnabled(false);
-      Alert.alert('Notifications', 'Notifications disabled');
-    }
+  const handleToggleNotifications = (value) => {
+    updateNotificationStatus(value);
   };
 
   const handleLogout = async () => {

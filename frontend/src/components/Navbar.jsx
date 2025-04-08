@@ -16,28 +16,28 @@ const Navbar = () => {
   };
 
   return (
-    <nav className="bg-primary text-white p-4 shadow-md">
+    <nav className="bg-white text-black p-4 shadow-md">
       <div className="container mx-auto flex items-center justify-between">
         {/* Logo */}
         <Link to="/" className="text-2xl font-bold flex items-center space-x-2">
-            <img src="/logo.png" alt="Logo" className="h-12 w-12" />
+            <img src="/logo.png" alt="Logo" className="h-20 w-80" />
         </Link>
 
         {/* Navigation Links */}
         <div className="flex items-center space-x-6">
           {role === 'admin' && (
             <>
-              <Link to="/" className="hover:text-secondary transition-colors">
+              <Link to="/" className="hover:text-primary transition-colors">
                 Dashboard
               </Link>
             </>
           )}
           {role === 'staff' && (
             <>
-              <Link to="/reports" className="hover:text-secondary transition-colors">
+              <Link to="/reports" className="hover:text-primary transition-colors">
                 Reports
               </Link>
-              <Link to="/scan" className="hover:text-secondary transition-colors">
+              <Link to="/scan" className="hover:text-primary transition-colors">
                 Scan QR
               </Link>
             </>
@@ -45,7 +45,7 @@ const Navbar = () => {
 
           {/* Notification Icon */}
           <Link to="/notifications" className="relative">
-            <BellIcon className="h-6 w-6 hover:text-secondary transition-colors" />
+            <BellIcon className="h-6 w-6 hover:text-primary transition-colors" />
             {unreadCount > 0 && (
               <span className="absolute -top-2 -right-2 bg-secondary text-white text-xs font-bold rounded-full h-5 w-5 flex items-center justify-center">
                 {unreadCount}
@@ -55,12 +55,12 @@ const Navbar = () => {
 
           {/* Profile Icon */}
           <Link to="/profile">
-            <UserIcon className="h-6 w-6 hover:text-secondary transition-colors" />
+            <UserIcon className="h-6 w-6 hover:text-primary transition-colors" />
           </Link>
 
           {/* Logout Icon */}
           <button onClick={handleLogout}>
-            <ArrowLeftEndOnRectangleIcon className="h-6 w-6 hover:text-secondary transition-colors" />
+            <ArrowLeftEndOnRectangleIcon className="h-6 w-6 hover:text-primary transition-colors" />
           </button>
         </div>
       </div>

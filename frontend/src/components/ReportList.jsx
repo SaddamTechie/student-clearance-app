@@ -43,22 +43,6 @@ const ReportList = () => {
       {/* Header */}
       <div className="flex justify-between items-center mb-6">
         <h2 className="text-3xl font-bold text-primary">Department Reports</h2>
-        <div className="flex space-x-4">
-          <Link
-            to="/scan"
-            className="flex items-center space-x-2 text-primary hover:text-secondary transition-colors"
-          >
-            <QrCodeIcon className="h-6 w-6" />
-            <span>Scan QR Code</span>
-          </Link>
-          <button
-            onClick={handleLogout}
-            className="flex items-center space-x-2 text-primary hover:text-secondary transition-colors"
-          >
-            <ArrowLeftEndOnRectangleIcon className="h-6 w-6" />
-            <span>Logout</span>
-          </button>
-        </div>
       </div>
 
       {/* Error Message */}

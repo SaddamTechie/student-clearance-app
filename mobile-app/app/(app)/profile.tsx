@@ -2,12 +2,12 @@ import React, { useState, useEffect } from 'react';
 import {
   View,
   Text,
-  Button,
   StyleSheet,
   ScrollView,
   TouchableOpacity,
   Switch,
-  ActivityIndicator
+  ActivityIndicator,
+  Alert,
 } from 'react-native';
 import axios from 'axios';
 import { apiUrl } from '../../config';
@@ -17,6 +17,7 @@ import { useNavigation } from '@react-navigation/native';
 import CertificateScreen from './certificate';
 import QRScreen from './qr';
 import ReportScreen from './report';
+import * as Notifications from 'expo-notifications';
 
 const primaryColor = '#7ABB3B';
 const secondaryColor = '#FF9933';
@@ -37,25 +38,17 @@ export default function ProfileScreen() {
     setLoading(true);
     try {
       const response = await axios.get(`${apiUrl}/status`, {
-        headers: {
-          Authorization: `Bearer ${session}`
-        },
+        headers: { Authorization: `Bearer ${session}` },
       });
       setStudent({
         email: response.data.email,
-        studentId: response.data.studentId
+        studentId: response.data.studentId,
       });
       setError(null);
-    } catch (error) {
-      if (axios.isAxiosError(error)) {
-        if (error.response) {
-          setError(error.response.data?.message || 'Failed to fetch profile data');
-        } else {
-          setError('Network error');
-        }
-      } else {
-        setError('An unknown error occurred');
-      }
+    } catch (err) {
+      const message = err.response?.data?.message || 'Failed to fetch profile data';
+      setError(message);
+      Alert.alert('Error', message);
     } finally {
       setLoading(false);
     }
@@ -63,10 +56,40 @@ export default function ProfileScreen() {
 
   useEffect(() => {
     fetchProfile();
+    const checkNotificationStatus = async () => {
+      const { status } = await Notifications.getPermissionsAsync();
+      setNotificationsEnabled(status === 'granted');
+    };
+    checkNotificationStatus();
   }, [session]);
 
+  const handleToggleNotifications = async (value) => {
+    if (value) {
+      const { status } = await Notifications.requestPermissionsAsync();
+      if (status === 'granted') {
+        setNotificationsEnabled(true);
+        Alert.alert('Success', 'Notifications enabled');
+      } else {
+        setNotificationsEnabled(false);
+        Alert.alert('Permission Denied', 'Notifications permission was not granted');
+      }
+    } else {
+      setNotificationsEnabled(false);
+      Alert.alert('Notifications', 'Notifications disabled');
+    }
+  };
+
   const handleLogout = async () => {
-    signOut();
+    Alert.alert('Logout', 'Are you sure you want to log out?', [
+      { text: 'Cancel', style: 'cancel' },
+      {
+        text: 'Yes',
+        onPress: () => {
+          signOut();
+          Alert.alert('Success', 'Logged out successfully');
+        },
+      },
+    ]);
   };
 
   const renderTabContent = () => {
@@ -77,10 +100,10 @@ export default function ProfileScreen() {
             <View style={styles.settingsSection}>
               <Text style={styles.sectionTitle}>Settings</Text>
               <View style={styles.settingItem}>
-                <Text style={styles.settingText}>Notifications</Text>
+                <Text style={styles.settingText}>Enable Notifications</Text>
                 <Switch
                   value={notificationsEnabled}
-                  onValueChange={setNotificationsEnabled}
+                  onValueChange={handleToggleNotifications}
                   trackColor={{ false: '#767577', true: primaryColor }}
                   thumbColor={notificationsEnabled ? '#fff' : '#f4f3f4'}
                 />
@@ -96,31 +119,11 @@ export default function ProfileScreen() {
           </View>
         );
       case 'qr':
-        return (
-          <View style={styles.tabContent}>
-            <Text style={styles.tabContentTitle}>QR Code</Text>
-            <Text style={styles.tabContentText}>Your QR code will be displayed here</Text>
-            <QRScreen />
-            {/* Placeholder for QR code component */}
-            {/* Add QR code component here when implemented */}
-          </View>
-        );
+        return <QRScreen />;
       case 'certificate':
-        return (
-          <View style={styles.tabContent}>
-            <Text style={styles.tabContentTitle}>Certificate</Text>
-            <Text style={styles.tabContentText}>Download your certificate here</Text>
-            <CertificateScreen />
-            {/* Add certificate download button here when implemented */}
-          </View>
-        );
+        return <CertificateScreen />;
       case 'report':
-        return (
-          <View style={styles.tabContent}>
-            <Text style={styles.tabContentTitle}>Report</Text>
-            <ReportScreen />
-          </View>
-        );
+        return <ReportScreen />;
       default:
         return null;
     }
@@ -138,26 +141,12 @@ export default function ProfileScreen() {
   if (error) {
     return (
       <View style={styles.errorContainer}>
+        <Ionicons name="alert-circle" size={48} color={secondaryColor} />
         <Text style={styles.errorTitle}>Error</Text>
         <Text style={styles.errorText}>{error}</Text>
-        <Ionicons name="alert-circle" size={24} color={secondaryColor} />
-        <Button
-          title="Retry"
-          onPress={() => {
-            setError(null);
-            fetchProfile();
-          }}
-          color={primaryColor}
-        />
-      </View>
-    );
-  }
-
-  if (!student) {
-    return (
-      <View style={styles.loadingContainer}>
-        <Ionicons name="sync-circle" size={48} color={primaryColor} />
-        <Text style={styles.loadingText}>Loading...</Text>
+        <TouchableOpacity style={styles.retryButton} onPress={fetchProfile}>
+          <Text style={styles.retryButtonText}>Retry</Text>
+        </TouchableOpacity>
       </View>
     );
   }
@@ -177,7 +166,7 @@ export default function ProfileScreen() {
           { id: 'profile', title: 'Profile', icon: 'person' },
           { id: 'qr', title: 'QR Code', icon: 'qr-code' },
           { id: 'certificate', title: 'Certificate', icon: 'document' },
-          { id: 'report', title: 'Report', icon: 'stats-chart' }
+          { id: 'report', title: 'Report', icon: 'stats-chart' },
         ].map((tab) => (
           <TouchableOpacity
             key={tab.id}
@@ -192,7 +181,7 @@ export default function ProfileScreen() {
             <Text
               style={[
                 styles.tabButtonText,
-                activeTab === tab.id && styles.activeTabButtonText
+                activeTab === tab.id && styles.activeTabButtonText,
               ]}
             >
               {tab.title}
@@ -201,46 +190,34 @@ export default function ProfileScreen() {
         ))}
       </View>
 
-      <ScrollView style={styles.contentContainer}>
-        {renderTabContent()}
-      </ScrollView>
+      <ScrollView style={styles.contentContainer}>{renderTabContent()}</ScrollView>
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: backgroundColor
-  },
+  container: { flex: 1, backgroundColor },
   header: {
     padding: 20,
+    paddingTop: 40,
     backgroundColor: primaryColor,
     borderBottomLeftRadius: 20,
     borderBottomRightRadius: 20,
-    elevation: 4
+    elevation: 4,
   },
   headerTitle: {
     fontSize: 28,
     fontWeight: 'bold',
     color: '#fff',
-    marginBottom: 10
+    marginBottom: 10,
   },
   studentInfo: {
     backgroundColor: 'rgba(255, 255, 255, 0.1)',
     padding: 10,
-    borderRadius: 10
+    borderRadius: 10,
   },
-  studentId: {
-    fontSize: 16,
-    color: '#fff',
-    fontWeight: 'bold'
-  },
-  studentEmail: {
-    fontSize: 14,
-    color: '#fff',
-    marginTop: 5
-  },
+  studentId: { fontSize: 16, color: '#fff', fontWeight: 'bold' },
+  studentEmail: { fontSize: 14, color: '#fff', marginTop: 5 },
   tabBar: {
     flexDirection: 'row',
     justifyContent: 'space-around',
@@ -250,58 +227,24 @@ const styles = StyleSheet.create({
     marginTop: -20,
     borderRadius: 15,
     elevation: 5,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4
   },
-  tabButton: {
-    alignItems: 'center',
-    padding: 10,
-    flex: 1
-  },
-  activeTabButton: {
-    borderBottomWidth: 2,
-    borderBottomColor: primaryColor
-  },
-  tabButtonText: {
-    fontSize: 12,
-    color: textSecondary,
-    marginTop: 5
-  },
-  activeTabButtonText: {
-    color: primaryColor,
-    fontWeight: 'bold'
-  },
-  contentContainer: {
-    flex: 1,
-    padding: 20
-  },
+  tabButton: { alignItems: 'center', padding: 10, flex: 1 },
+  activeTabButton: { borderBottomWidth: 2, borderBottomColor: primaryColor },
+  tabButtonText: { fontSize: 12, color: textSecondary, marginTop: 5 },
+  activeTabButtonText: { color: primaryColor, fontWeight: 'bold' },
+  contentContainer: { flex: 1, padding: 20 },
   tabContent: {
     backgroundColor: '#fff',
     borderRadius: 15,
     padding: 20,
-    elevation: 2
+    elevation: 2,
   },
-  tabContentTitle: {
-    fontSize: 20,
-    fontWeight: 'bold',
-    color: textColor,
-    marginBottom: 15
-  },
-  tabContentText: {
-    fontSize: 16,
-    color: textSecondary,
-    lineHeight: 24
-  },
-  settingsSection: {
-    marginBottom: 20
-  },
+  settingsSection: { marginBottom: 20 },
   sectionTitle: {
     fontSize: 18,
     fontWeight: 'bold',
     color: textColor,
-    marginBottom: 15
+    marginBottom: 15,
   },
   settingItem: {
     flexDirection: 'row',
@@ -309,15 +252,10 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     paddingVertical: 10,
     borderBottomWidth: 1,
-    borderBottomColor: '#eee'
+    borderBottomColor: '#eee',
   },
-  settingText: {
-    fontSize: 16,
-    color: textColor
-  },
-  clearanceSection: {
-    marginTop: 20
-  },
+  settingText: { fontSize: 16, color: textColor },
+  clearanceSection: { marginTop: 20 },
   logoutButton: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -327,39 +265,45 @@ const styles = StyleSheet.create({
     borderRadius: 10,
     borderWidth: 1,
     borderColor: secondaryColor,
-    marginTop: 10
   },
   logoutText: {
     fontSize: 16,
     marginLeft: 10,
     color: secondaryColor,
-    fontWeight: 'bold'
+    fontWeight: 'bold',
   },
   errorContainer: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    padding: 20
+    padding: 20,
   },
   errorTitle: {
     fontSize: 24,
     color: secondaryColor,
-    marginBottom: 10
+    marginBottom: 10,
   },
   errorText: {
     fontSize: 16,
     color: textSecondary,
     marginBottom: 20,
-    textAlign: 'center'
+    textAlign: 'center',
   },
+  retryButton: {
+    backgroundColor: primaryColor,
+    paddingVertical: 10,
+    paddingHorizontal: 20,
+    borderRadius: 8,
+  },
+  retryButtonText: { color: '#fff', fontSize: 16, fontWeight: 'bold' },
   loadingContainer: {
     flex: 1,
     justifyContent: 'center',
-    alignItems: 'center'
+    alignItems: 'center',
   },
   loadingText: {
     fontSize: 18,
     color: textSecondary,
-    marginTop: 20
-  }
+    marginTop: 20,
+  },
 });

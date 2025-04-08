@@ -6,6 +6,7 @@ const staffSchema = new Schema({
   password: { type: String, required: true },
   department: { type: String, required: true, enum: ['finance', 'library', 'department', 'hostel', 'academic'] },
   role: { type: String, default: 'staff', enum: ['staff', 'admin'] },
+  pushToken: { type: String },
 });
 
 module.exports = mongoose.model('Staff', staffSchema);

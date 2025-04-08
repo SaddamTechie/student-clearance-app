@@ -1,11 +1,33 @@
-import React, { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, RefreshControl } from 'react-native';
+import React, { useState, useEffect, useRef } from 'react';
+import {
+  View,
+  Text,
+  StyleSheet,
+  ScrollView,
+  TouchableOpacity,
+  RefreshControl,
+  Alert,
+  Platform,
+} from 'react-native';
 import axios from 'axios';
 import { apiUrl, socketUrl } from '../../config';
 import { useSession } from '@/ctx';
 import { Ionicons } from '@expo/vector-icons';
 import io from 'socket.io-client';
 import { useNotificationsContext } from '../../notificationContext';
+import * as Notifications from 'expo-notifications';
+import * as Device from 'expo-device';
+
+const primaryColor = '#7ABB3B';
+const secondaryColor = '#FF9933';
+
+Notifications.setNotificationHandler({
+  handleNotification: async () => ({
+    shouldShowAlert: true,
+    shouldPlaySound: true,
+    shouldSetBadge: true,
+  }),
+});
 
 export default function NotificationsScreen() {
   const { updateUnreadCount } = useNotificationsContext();
@@ -13,36 +35,97 @@ export default function NotificationsScreen() {
   const [error, setError] = useState(null);
   const { session } = useSession();
   const [refreshing, setRefreshing] = useState(false);
+  const notificationListener = useRef();
+  const responseListener = useRef();
+
+  useEffect(() => {
+    const registerForPushNotifications = async () => {
+      if (Device.isDevice) {
+        const { status: existingStatus } = await Notifications.getPermissionsAsync();
+        let finalStatus = existingStatus;
+        if (existingStatus !== 'granted') {
+          const { status } = await Notifications.requestPermissionsAsync();
+          finalStatus = status;
+        }
+        if (finalStatus !== 'granted') {
+          Alert.alert('Permission Denied', 'Push notifications are disabled. Enable them in settings to receive updates.');
+        }
+        if (Platform.OS === 'android') {
+          Notifications.setNotificationChannelAsync('default', {
+            name: 'default',
+            importance: Notifications.AndroidImportance.MAX,
+            vibrationPattern: [0, 250, 250, 250],
+            lightColor: primaryColor,
+          });
+        }
+      } else {
+        console.log('Must use physical device for Push Notifications');
+      }
+    };
+
+    registerForPushNotifications();
+
+    notificationListener.current = Notifications.addNotificationReceivedListener((notification) => {
+      const { title, body } = notification.request.content;
+      setNotifications((prev) => [
+        { _id: Date.now().toString(), message: body, read: false, createdAt: new Date() },
+        ...prev,
+      ]);
+    });
+
+    responseListener.current = Notifications.addNotificationResponseReceivedListener((response) => {
+      console.log('Notification tapped:', response);
+    });
+
+    return () => {
+      Notifications.removeNotificationSubscription(notificationListener.current);
+      Notifications.removeNotificationSubscription(responseListener.current);
+    };
+  }, []);
 
   useEffect(() => {
     if (!session) return;
 
-    // Fetch initial notifications
     const fetchNotifications = async () => {
       try {
         const response = await axios.get(`${apiUrl}/notifications`, {
           headers: { Authorization: `Bearer ${session}` },
         });
         setNotifications(response.data);
+        updateUnreadCount(response.data.filter((n) => !n.read).length);
+        setError(null);
       } catch (err) {
-        setError(err.response?.data?.message || 'Failed to fetch notifications');
+        const message = err.response?.data?.message || 'Failed to fetch notifications';
+        setError(message);
+        Alert.alert('Error', message);
       }
     };
     fetchNotifications();
 
-    // Setup Socket.IO
     const socket = io(`${socketUrl}`, { transports: ['websocket'] });
     socket.on('connect', () => {
       const userId = JSON.parse(atob(session.split('.')[1])).id;
       socket.emit('join', userId);
     });
-    socket.on('notification', (notification) => {
+    socket.on('notification', async (notification) => {
       setNotifications((prev) => [notification, ...prev]);
+      updateUnreadCount((prev) => prev + 1);
+      await Notifications.scheduleNotificationAsync({
+        content: {
+          title: 'New Notification',
+          body: notification.message,
+          data: { notificationId: notification._id },
+        },
+        trigger: null,
+      });
     });
-    socket.on('error', (err) => setError(err.message));
+    socket.on('error', (err) => {
+      setError(err.message);
+      Alert.alert('Socket Error', err.message);
+    });
 
     return () => socket.disconnect();
-  }, [session]);
+  }, [session, updateUnreadCount]);
 
   const markAsRead = async (id) => {
     try {
@@ -52,9 +135,9 @@ export default function NotificationsScreen() {
       setNotifications((prev) =>
         prev.map((n) => (n._id === id ? { ...n, read: true } : n))
       );
-      updateUnreadCount((prev) => prev - 1); // Update unread count
+      updateUnreadCount((prev) => Math.max(prev - 1, 0));
     } catch (err) {
-      console.error('Error marking as read:', err);
+      Alert.alert('Error', 'Failed to mark notification as read');
     }
   };
 
@@ -65,71 +148,148 @@ export default function NotificationsScreen() {
         headers: { Authorization: `Bearer ${session}` },
       });
       setNotifications(response.data);
+      updateUnreadCount(response.data.filter((n) => !n.read).length);
       setError(null);
-      updateUnreadCount(response.data.filter((n) => !n.read).length); // Update unread count on refresh
     } catch (err) {
-      setError(err.response?.data?.message || 'Failed to fetch notifications');
+      const message = err.response?.data?.message || 'Failed to fetch notifications';
+      setError(message);
+      Alert.alert('Error', message);
+    } finally {
+      setRefreshing(false);
     }
-    setRefreshing(false);
   };
 
-  if (error) return <Text style={styles.error}>{error}</Text>;
-  if (!notifications) return <Text>Loading...</Text>;
-
-  const unreadCount = notifications.filter((n) => !n.read).length;
+  if (error) {
+    return (
+      <View style={styles.errorContainer}>
+        <Ionicons name="alert-circle" size={48} color={secondaryColor} />
+        <Text style={styles.errorText}>{error}</Text>
+        <TouchableOpacity style={styles.retryButton} onPress={handleRefresh}>
+          <Text style={styles.retryButtonText}>Retry</Text>
+        </TouchableOpacity>
+      </View>
+    );
+  }
 
   return (
-    <ScrollView
-      style={styles.container}
-      refreshControl={
-        <RefreshControl refreshing={refreshing} onRefresh={handleRefresh} />
-      }
-    >
-      <Text style={styles.title}>Notifications ({unreadCount} unread)</Text>
-      {notifications.length === 0 ? (
-        <Text style={styles.info}>No notifications yet.</Text>
-      ) : (
-        notifications.map((notification) => (
-          <TouchableOpacity
-            key={notification._id}
-            style={[styles.notificationItem, notification.read ? styles.read : styles.unread]}
-            onPress={() => !notification.read && markAsRead(notification._id)}
-          >
-            <Ionicons
-              name={notification.read ? 'mail-open-outline' : 'mail-outline'}
-              size={24}
-              color={notification.read ? '#666' : '#007AFF'}
-              style={styles.icon}
-            />
-            <View style={styles.textContainer}>
-              <Text style={styles.message}>{notification.message}</Text>
-              <Text style={styles.date}>
-                {new Date(notification.createdAt).toLocaleString()}
-              </Text>
-            </View>
-          </TouchableOpacity>
-        ))
-      )}
-    </ScrollView>
+    <View style={styles.container}>
+      <View style={styles.header}>
+        <Text style={styles.headerTitle}>Notifications</Text>
+        <Text style={styles.headerSubtitle}>
+          {notifications.filter((n) => !n.read).length} unread
+        </Text>
+      </View>
+      <ScrollView
+        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={handleRefresh} />}
+        contentContainerStyle={styles.scrollContent}
+      >
+        {notifications.length === 0 ? (
+          <View style={styles.emptyContainer}>
+            <Ionicons name="notifications-off" size={48} color={textSecondary} />
+            <Text style={styles.emptyText}>No notifications yet</Text>
+          </View>
+        ) : (
+          notifications.map((notification) => (
+            <TouchableOpacity
+              key={notification._id}
+              style={[
+                styles.notificationItem,
+                notification.read ? styles.read : styles.unread,
+              ]}
+              onPress={() => !notification.read && markAsRead(notification._id)}
+            >
+              <Ionicons
+                name={notification.read ? 'mail-open' : 'mail'}
+                size={24}
+                color={notification.read ? textSecondary : primaryColor}
+                style={styles.icon}
+              />
+              <View style={styles.textContainer}>
+                <Text style={styles.message}>{notification.message}</Text>
+                <Text style={styles.date}>
+                  {new Date(notification.createdAt).toLocaleString()}
+                </Text>
+              </View>
+            </TouchableOpacity>
+          ))
+        )}
+      </ScrollView>
+    </View>
   );
 }
 
+const textSecondary = '#666';
+
 const styles = StyleSheet.create({
-  container: { flex: 1, padding: 20, backgroundColor: '#f5f5f5' },
-  title: { fontSize: 28, fontWeight: 'bold', textAlign: 'center', marginBottom: 20 },
-  info: { fontSize: 16, textAlign: 'center', color: '#666', marginBottom: 20 },
+  container: { flex: 1, backgroundColor: '#f5f5f5' },
+  header: {
+    backgroundColor: primaryColor,
+    padding: 20,
+    paddingTop: 40,
+    borderBottomLeftRadius: 20,
+    borderBottomRightRadius: 20,
+    elevation: 4,
+  },
+  headerTitle: {
+    fontSize: 28,
+    fontWeight: 'bold',
+    color: '#fff',
+    textAlign: 'center',
+  },
+  headerSubtitle: {
+    fontSize: 16,
+    color: '#fff',
+    textAlign: 'center',
+    marginTop: 5,
+  },
+  scrollContent: { padding: 15 },
   notificationItem: {
     flexDirection: 'row',
     padding: 15,
     borderRadius: 10,
     marginBottom: 10,
     elevation: 2,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
   },
   read: { backgroundColor: '#fff' },
-  unread: { backgroundColor: '#e6f0ff' },
+  unread: { backgroundColor: '#e6ffe6' },
   icon: { marginRight: 15 },
   textContainer: { flex: 1 },
-  message: { fontSize: 16, fontWeight: '500' },
-  date: { fontSize: 12, color: '#666', marginTop: 5 },
-  error: { fontSize: 16, color: 'red', textAlign: 'center', padding: 20 },
+  message: { fontSize: 16, fontWeight: '500', color: '#333' },
+  date: { fontSize: 12, color: textSecondary, marginTop: 5 },
+  errorContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 20,
+    backgroundColor: '#f5f5f5',
+  },
+  errorText: {
+    fontSize: 16,
+    color: secondaryColor,
+    textAlign: 'center',
+    marginVertical: 20,
+  },
+  retryButton: {
+    backgroundColor: primaryColor,
+    paddingVertical: 10,
+    paddingHorizontal: 20,
+    borderRadius: 8,
+  },
+  retryButtonText: { color: '#fff', fontSize: 16, fontWeight: 'bold' },
+  emptyContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 20,
+  },
+  emptyText: {
+    fontSize: 16,
+    color: textSecondary,
+    marginTop: 20,
+    textAlign: 'center',
+  },
 });

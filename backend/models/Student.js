@@ -8,6 +8,7 @@ const studentSchema = new Schema({
   password: { type: String, required: true }, // Add password field
   clearanceStatus: { type: Map, of: String, default: {} },
   certificateGenerated: { type: Boolean, default: false },
+  pushToken: String,
 });
 
 module.exports = mongoose.model('Student', studentSchema);

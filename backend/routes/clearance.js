@@ -1,3 +1,4 @@
+const admin = require('firebase-admin');
 const express = require('express');
 const router = express.Router();
 const Student = require('../models/Student');
@@ -12,8 +13,7 @@ const { generateCertificate } = require('../utils/pdfGenerator');
 const jwt = require('jsonwebtoken');
 const bcrypt = require('bcryptjs');
 const dotenv = require('dotenv');
-const { Expo } = require('expo-server-sdk');
-const expo = new Expo();
+
 
 dotenv.config();
 const secret = process.env.SECRET_KEY || 'your-default-secret-key';
@@ -53,49 +53,75 @@ const sendNotification = async (io, userId, message, type = 'clearance') => {
   //console.log(`Notification sent to ${userId}: ${message}`);
 };
 
-
-// Save push token (e.g., on login or profile update)
+//Save Push notification token
 router.post('/save-push-token', authMiddleware, async (req, res) => {
   const { token } = req.body;
   const userId = req.user.id;
+  console.log('Received push token:', token, 'for user:', userId);
   try {
     if (req.user.role === 'student') {
-      await Student.findOneAndUpdate({ studentId: userId }, { pushToken: token });
+      const student = await Student.findOneAndUpdate(
+        { studentId: userId },
+        { pushToken: token === null ? null : token },
+        { new: true }
+      );
+      console.log('Updated student:', student);
     } else if (['staff', 'admin'].includes(req.user.role)) {
-      await Staff.findByIdAndUpdate(userId, { pushToken: token });
+      const staff = await Staff.findByIdAndUpdate(
+        userId,
+        { pushToken: token === null ? null : token },
+        { new: true }
+      );
+      console.log('Updated staff:', staff);
     }
-    res.json({ message: 'Push token saved' });
+    res.json({ message: token === null ? 'Push token cleared' : 'Push token saved' });
   } catch (err) {
+    console.error('Error saving push token:', err);
     res.status(500).json({ message: 'Failed to save push token', error: err.message });
   }
 });
 
-// Send push notification 
+// Initialize Firebase Admin with service account
+const firebaseCredentials = JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT || '{}');
+admin.initializeApp({
+  credential: admin.credential.cert(firebaseCredentials),
+});
+
 const sendPushNotification = async (pushToken, message, title = 'Clearance Update') => {
-  if (!Expo.isExpoPushToken(pushToken)) {
-    console.warn(`Invalid Expo push token: ${pushToken}`);
+  if (!pushToken) {
+    console.warn('No push token provided');
     return;
   }
 
-  const messages = [{
-    to: pushToken,
-    sound: 'default',
-    title,
-    body: message,
-    data: { someData: 'extra' },
-  }];
+  const payload = {
+    token: pushToken,
+    notification: {
+      title,
+      body: message,
+    },
+    data: {
+      someData: 'extra',
+    },
+    android: {
+      priority: 'high',
+    },
+    apns: { // Optional: for iOS compatibility
+      payload: {
+        aps: {
+          sound: 'default',
+        },
+      },
+    },
+  };
 
   try {
-    const chunks = expo.chunkPushNotifications(messages);
-    const tickets = [];
-    for (const chunk of chunks) {
-      const ticketChunk = await expo.sendPushNotificationsAsync(chunk);
-      tickets.push(...ticketChunk);
-    }
-    // Log tickets for debugging or receipt checking if needed
-    console.log('Push notification sent:', tickets);
+    const response = await admin.messaging().send(payload);
+    console.log('Push notification sent successfully:', response);
   } catch (err) {
     console.error('Failed to send push notification:', err);
+    if (err.code === 'messaging/invalid-registration-token') {
+      console.warn('Invalid token, consider clearing it from the database');
+    }
   }
 };
 

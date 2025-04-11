@@ -18,11 +18,6 @@ export default function Index() {
       </View>
       <Text style={styles.title}>Welcome to Student Clearance</Text>
       <Text style={styles.tagline}>Streamline your clearance process with ease.</Text>
-      <Image
-        source={require('../assets/images/hero.png')} 
-        style={styles.image}
-        resizeMode="cover"
-      />
       <Text style={styles.description}>
         This app helps students manage their clearance status efficiently, ensuring a smooth graduation process.
       </Text>

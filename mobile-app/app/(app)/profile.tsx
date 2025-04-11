@@ -31,6 +31,7 @@ export default function ProfileScreen() {
   const [error, setError] = useState(null);
   const [activeTab, setActiveTab] = useState('profile');
   const [notificationsEnabled, setNotificationsEnabled] = useState(false);
+  const [isToggling, setIsToggling] = useState(false);
   const { signOut, session } = useSession();
   const navigation = useNavigation();
   const [loading, setLoading] = useState(true);
@@ -56,64 +57,90 @@ export default function ProfileScreen() {
   };
 
   const savePushToken = async (token) => {
+    console.log('Saving push token:', token);
     try {
-      await axios.post(
+      const response = await axios.post(
         `${apiUrl}/save-push-token`,
         { token },
         { headers: { Authorization: `Bearer ${session}` } }
       );
-      console.log('Push token saved successfully');
+      console.log('Backend response:', response.data);
+      return true;
     } catch (err) {
-      console.error('Failed to save push token:', err);
-      Alert.alert('Error', 'Could not save push notification token');
-      throw err; // Re-throw to handle in caller
+      console.error('Failed to save push token:', err.response?.data || err.message);
+      Alert.alert('Error', 'Failed to save push token: ' + (err.response?.data?.message || err.message));
+      return false;
     }
   };
 
   const updateNotificationStatus = async (enabled) => {
     if (!Device.isDevice) {
       Alert.alert('Error', 'Push notifications require a physical device');
+      setNotificationsEnabled(false);
       return;
     }
 
+    setIsToggling(true);
     try {
+      const { status: existingStatus } = await Notifications.getPermissionsAsync();
+      console.log('Current permission status:', existingStatus);
+
       if (enabled) {
-        const { status } = await Notifications.requestPermissionsAsync();
-        if (status === 'granted') {
-          const token = (await Notifications.getExpoPushTokenAsync()).data;
-          await savePushToken(token);
+        let finalStatus = existingStatus;
+        if (existingStatus !== 'granted') {
+          const { status } = await Notifications.requestPermissionsAsync();
+          finalStatus = status;
+          console.log('Requested permission, new status:', finalStatus);
+        }
+        if (finalStatus !== 'granted') {
+          Alert.alert('Permission Denied', 'Please enable notifications in your device settings.');
+          setNotificationsEnabled(false);
+          return;
+        }
+        const token = (await Notifications.getDevicePushTokenAsync()).data; // Use getDevicePushTokenAsync for EAS
+        console.log('Device push token:', token);
+        const success = await savePushToken(token);
+        if (success) {
           setNotificationsEnabled(true);
           Alert.alert('Success', 'Notifications enabled');
         } else {
           setNotificationsEnabled(false);
-          Alert.alert('Permission Denied', 'Notifications permission was not granted');
         }
       } else {
-        // Optionally clear the token on the backend if disabled
-        await axios.post(
-          `${apiUrl}/save-push-token`,
-          { token: null }, // Send null to clear token
-          { headers: { Authorization: `Bearer ${session}` } }
-        );
-        setNotificationsEnabled(false);
-        Alert.alert('Notifications', 'Notifications disabled');
+        const success = await savePushToken(null);
+        if (success) {
+          setNotificationsEnabled(false);
+          Alert.alert('Success', 'Notifications disabled');
+        } else {
+          setNotificationsEnabled(true);
+        }
       }
     } catch (err) {
-      console.error('Error updating notification status:', err);
-      setNotificationsEnabled(!enabled); // Revert on error
+      console.error('Error in updateNotificationStatus:', err);
+      Alert.alert('Error', 'An unexpected error occurred: ' + err.message);
+      setNotificationsEnabled(!enabled);
+    } finally {
+      setIsToggling(false);
     }
   };
 
   useEffect(() => {
     fetchProfile();
     const checkNotificationStatus = async () => {
-      const { status } = await Notifications.getPermissionsAsync();
-      setNotificationsEnabled(status === 'granted');
+      try {
+        const { status } = await Notifications.getPermissionsAsync();
+        console.log('Initial permission status:', status);
+        setNotificationsEnabled(status === 'granted');
+      } catch (err) {
+        console.error('Error checking permissions:', err);
+      }
     };
     checkNotificationStatus();
   }, [session]);
 
   const handleToggleNotifications = (value) => {
+    if (isToggling) return;
+    console.log('Toggle clicked, new value:', value);
     updateNotificationStatus(value);
   };
 
@@ -144,6 +171,7 @@ export default function ProfileScreen() {
                   onValueChange={handleToggleNotifications}
                   trackColor={{ false: '#767577', true: primaryColor }}
                   thumbColor={notificationsEnabled ? '#fff' : '#f4f3f4'}
+                  disabled={isToggling}
                 />
               </View>
             </View>

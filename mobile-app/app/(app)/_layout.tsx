@@ -69,8 +69,8 @@ function AppTabs() {
     >
       <Tab.Screen name="HomeTab" component={HomeStack} />
       <Tab.Screen name="Status" component={StatusScreen} />
-      {/* <Tab.Screen name="Notifications" component={NotificationsScreen} /> */}
-      <Tab.Screen name="Notifications" component={HistoryScreen} />
+      <Tab.Screen name="Notifications" component={NotificationsScreen} />
+      {/* <Tab.Screen name="Notifications" component={HistoryScreen} /> */}
       <Tab.Screen name="QR" component={QRScreen} />
       {/* <Tab.Screen name="Certificate" component={CertificateScreen} /> */}
       {/* <Tab.Screen name="Report" component={ReportScreen} /> */}

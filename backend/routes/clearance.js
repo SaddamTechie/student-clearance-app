@@ -13,6 +13,7 @@ const { generateCertificate } = require('../utils/pdfGenerator');
 const jwt = require('jsonwebtoken');
 const bcrypt = require('bcryptjs');
 const dotenv = require('dotenv');
+const { initiatePayment } = require('../utils/payment');
 
 
 dotenv.config();
@@ -154,7 +155,7 @@ router.post('/login', async (req, res) => {
     }
 
     const token = jwt.sign({ id: user.studentId || user._id, role }, process.env.SECRET_KEY, {
-      expiresIn: '1h',
+      expiresIn: '24h',
     });
     res.json({ token, role });
   } catch (err) {
@@ -381,7 +382,7 @@ router.post('/verify', authMiddleware, async (req, res) => {
 
 // Pay obligation (partial or full)
 router.post('/pay-obligation', authMiddleware, async (req, res) => {
-  const { obligationId, amount } = req.body;
+  const { obligationId, amount,phoneNumber } = req.body;
   const io = req.app.get('io');
   const studentId = req.user.id;
   if (req.user.role !== 'student') {
@@ -396,6 +397,7 @@ router.post('/pay-obligation', authMiddleware, async (req, res) => {
     if (!obligation) {
       return res.status(404).json({ message: 'Obligation not found' });
     }
+    await initiatePayment(phoneNumber, amount,studentId);
     obligation.amountPaid += amount;
     obligation.status = obligation.amountPaid >= obligation.amount ? 'cleared' : 'partial';
 
@@ -409,13 +411,13 @@ router.post('/pay-obligation', authMiddleware, async (req, res) => {
     }
 
      // Notify student
-     await sendNotification(io, studentId, `Paid ${amount}, remaining: ${obligation.amount - obligation.amountPaid}`);
-    // Update history
-    student.clearanceHistory.push({
-      department: obligation.type.split(' ')[0], // e.g., "Library" from "Library Fine"
-      status: obligation.status,
-      comment: `Paid ${amount}, remaining: ${obligation.amount - obligation.amountPaid}`,
-    });
+     await sendNotification(io, studentId, `${obligation.type.split(' ')[0]} : ${obligation.status} - Paid ${amount}, remaining: ${obligation.amount - obligation.amountPaid}`);
+    // // Update history
+    // student.clearanceHistory.push({
+    //   department: obligation.type.split(' ')[0], // e.g., "Library" from "Library Fine"
+    //   status: obligation.status,
+    //   comment: `Paid ${amount}, remaining: ${obligation.amount - obligation.amountPaid}`,
+    // });
 
     await student.save();
     res.json({ message: 'Payment recorded', obligation });
@@ -603,12 +605,12 @@ router.post('/request-clearance', authMiddleware, async (req, res) => {
       await sendPushNotification(student.pushToken,'Clearance request initiated' );
     }
 
-    student.clearanceHistory.push({
-      department: 'System',
-      status: 'pending',
-      comment: 'Clearance request initiated',
-      timestamp: new Date(),
-    });
+    // student.clearanceHistory.push({
+    //   department: 'System',
+    //   status: 'pending',
+    //   comment: 'Clearance request initiated',
+    //   timestamp: new Date(),
+    // });
     
     await student.save();
     if (student.pushToken) {

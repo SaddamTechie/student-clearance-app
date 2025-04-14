@@ -5,6 +5,8 @@ const http = require('http');
 const { Server } = require('socket.io');
 const clearanceRoutes = require('./routes/clearance');
 require('dotenv').config();
+const {  initiatePayment } = require('./utils/payment');
+const { seedDatabase } = require('./utils/seed');
 
 const app = express();
 const server = http.createServer(app);
@@ -18,13 +20,37 @@ app.use(express.json());
 app.use(cors());
 
 // MongoDB Connection
-mongoose.connect(process.env.MONGO_URI)
-  .then(() => console.log('MongoDB connected'))
-  .catch(err => console.error(err));
+const connectDB = async () => {
+  try {
+    await mongoose.connect(process.env.MONGO_URI);
+    console.log('MongoDB connected');
+  } catch (error) {
+    console.error('MongoDB connection error:', error);
+    process.exit(1);
+  }
+}
 
-// Routes
-app.get('/', (req, res) => {
-  res.send('API is running...');
+
+
+// Test Payment
+app.get('/api/payment/:phone', async (req, res) => {
+  const { phone } = req.params;
+  const amount = 1000; // Amount to be paid
+  await initiatePayment(phone, amount,"TESTING");
+  res.status(200).json({ message: 'Payment request sent' });
+}
+);
+
+// Seed
+app.get('/api/seed', async (req, res) => {
+  try {
+    await seedDatabase();
+    connectDB();
+    res.status(200).json({ message: 'Database seeded successfully' });
+  } catch (error) {
+    console.error('Error seeding database:', error);
+    res.status(500).json({ message: 'Error seeding database' });
+  }
 });
 
 app.use('/api/clearance', clearanceRoutes);
@@ -49,4 +75,7 @@ app.set('io', io)
 
 // Start Server
 const PORT = process.env.PORT || 5000;
-server.listen(PORT, () => console.log(`Server running on port ${PORT}`));
+server.listen(PORT, () => {
+  connectDB();
+  console.log(`Server running on port ${PORT}`);
+});

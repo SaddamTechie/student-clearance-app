@@ -3,6 +3,7 @@ const mongoose = require('mongoose');
 const bcrypt = require('bcryptjs');
 const Student = require('../models/Student');
 const dotenv = require('dotenv');
+const Notification = require('../models/Notification');
 dotenv.config();
 
 const students = [
@@ -105,6 +106,7 @@ const seedDatabase = async () => {
     });
     console.log('Connected to MongoDB');
     await Student.deleteMany({});
+    await Notification.deleteMany({});
     for (const student of students) {
       student.password = await bcrypt.hash(student.studentId, 10);
       await Student.create(student);
@@ -117,4 +119,10 @@ const seedDatabase = async () => {
   }
 };
 
-seedDatabase();
+if (require.main === module) {
+  seedDatabase();
+}
+
+module.exports = { 
+  seedDatabase
+  };

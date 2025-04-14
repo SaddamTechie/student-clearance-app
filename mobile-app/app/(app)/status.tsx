@@ -1,185 +1,175 @@
+// mobile/screens/StatusScreen.tsx
 import React, { useState, useEffect } from 'react';
-import { View, Text, Button, StyleSheet, ScrollView, RefreshControl } from 'react-native';
+import {
+  View,
+  Text,
+  StyleSheet,
+  ScrollView,
+  RefreshControl,
+  ActivityIndicator,
+  Alert,
+} from 'react-native';
 import axios from 'axios';
 import { apiUrl } from '../../config';
-import { useSession } from '@/ctx';
+import { useSession } from '../../ctx';
 import { Ionicons } from '@expo/vector-icons';
 
-export default function StatusScreen() {
-  const [clearance, setClearance] = useState(null);
-  const [error, setError] = useState(null);
-  const { session } = useSession();
-  const [refreshing, setRefreshing] = useState(false);
+const primaryColor = '#7ABB3B';
+const secondaryColor = '#FF9933';
+const backgroundColor = '#f5f5f5';
+const textColor = '#333';
+const textSecondary = '#666';
 
-  // Function to fetch clearance data
-  const fetchClearance = async () => {
-    if (!session) {
-      setError('No session available');
-      return;
-    }
+export default function StatusScreen() {
+  const [status, setStatus] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
+  const { session } = useSession();
+
+  const fetchStatus = async () => {
+    setLoading(true);
     try {
       const response = await axios.get(`${apiUrl}/status`, {
         headers: { Authorization: `Bearer ${session}` },
       });
-      console.log('Clearance data received:', JSON.stringify(response.data, null, 2));
-      setClearance(response.data);
-      setError(null);
-    } catch (error) {
-      if (axios.isAxiosError(error)) {
-        if (error.response) {
-          if (error.response.status === 401) {
-            setError('Session expired. Please log in again.');
-          } else {
-            setError(error.response.data?.message || 'Failed to fetch clearance data');
-          }
-        } else {
-          setError('Network error');
-        }
-      } else {
-        setError('An unknown error occurred');
-      }
+      setStatus(response.data);
+    } catch (err) {
+      Alert.alert('Error', err.response?.data?.message || 'Failed to fetch status');
+    } finally {
+      setLoading(false);
     }
   };
 
-  useEffect(() => {
-    fetchClearance(); // Initial fetch
-
-    // Poll for updates every 10 seconds
-    const intervalId = setInterval(fetchClearance, 10000);
-
-    // Clear the interval when the component unmounts
-    return () => clearInterval(intervalId);
-  }, [session]);
-
   const handleRefresh = async () => {
     setRefreshing(true);
-    await fetchClearance();
+    await fetchStatus();
     setRefreshing(false);
   };
 
-  if (error) {
-    return (
-      <View style={styles.errorContainer}>
-        <Text style={styles.errorTitle}>Error</Text>
-        <Text style={styles.errorText}>{error}</Text>
-        <Ionicons name="alert-circle" size={24} color="#FF9933" />
-        <Button title="Retry" onPress={() => setError(null)} />
-      </View>
-    );
-  }
+  useEffect(() => {
+    fetchStatus();
+  }, []);
 
-  if (!clearance) {
+  if (loading) {
     return (
       <View style={styles.loadingContainer}>
-        <Ionicons name="sync-circle" size={48} color="#7ABB3B" />
+        <ActivityIndicator size="large" color={primaryColor} />
         <Text style={styles.loadingText}>Loading...</Text>
       </View>
     );
   }
 
-  if (!clearance.departmentStatus) {
+  if (!status) {
     return (
       <View style={styles.errorContainer}>
-        <Text style={styles.errorTitle}>Error</Text>
-        <Text style={styles.errorText}>Invalid clearance data.</Text>
-        <Ionicons name="alert-circle" size={24} color="#FF9933" />
+        <Text style={styles.errorText}>Unable to load status</Text>
       </View>
     );
   }
 
-  const getStatusIcon = (status) => {
-    switch (status) {
-      case 'cleared':
-        return { name: 'checkmark-circle', color: '#28a745' };
-      case 'rejected':
-        return { name: 'close-circle', color: '#dc3545' };
-      case 'reviewing':
-        return { name: 'time-outline', color: '#ffc107' };
-      case 'pending':
-      default:
-        return { name: 'ellipse-outline', color: '#6c757d' };
-    }
-  };
+  const departments = ['academics', 'finance', 'library', 'hostel'].map((dept) => ({
+    name: dept,
+    status: status.clearanceStatus.find((s) => s.department === dept)?.status || 'pending',
+    active: status.clearanceRequestDepartment === dept,
+  }));
 
-  const departmentStatuses = Object.entries(clearance.departmentStatus);
-  const total = departmentStatuses.length;
-  const clearedCount = departmentStatuses.filter(([_, status]) => status === 'cleared').length;
+  const clearedCount = departments.filter((d) => d.status === 'cleared').length;
+  const total = departments.length;
   const progressPercentage = total > 0 ? (clearedCount / total) * 100 : 0;
 
   return (
     <ScrollView
       style={styles.container}
       refreshControl={
-        <RefreshControl refreshing={refreshing} onRefresh={handleRefresh} />
+        <RefreshControl refreshing={refreshing} onRefresh={handleRefresh} tintColor={primaryColor} />
       }
     >
-      <Text style={styles.title}>Clearance Status</Text>
-      {!clearance.clearanceRequested ? (
-        <Text style={styles.info}>Request clearance from the Home tab to start tracking.</Text>
+      <Text style={styles.title}>Clearance Progress</Text>
+      <View style={styles.progressContainer}>
+        <Text style={styles.progressText}>
+          {clearedCount} of {total} Departments Cleared ({Math.round(progressPercentage)}%)
+        </Text>
+        <View style={styles.progressBar}>
+          <View style={[styles.progressFill, { width: `${progressPercentage}%` }]} />
+        </View>
+      </View>
+      {status.clearanceRequestStatus ? (
+        <Text style={styles.currentDept}>
+          Current Review: {status.clearanceRequestDepartment || 'Complete'}
+        </Text>
       ) : (
-        <>
-          <View style={styles.progressContainer}>
-            <Text style={styles.progressText}>
-              {clearedCount} of {total} Departments Cleared ({Math.round(progressPercentage)}%)
-            </Text>
-            <View style={styles.progressBar}>
-              <View style={[styles.progressFill, { width: `${progressPercentage}%` }]} />
-            </View>
-          </View>
-          {departmentStatuses.map(([dept, status]) => {
-            const { name, color } = getStatusIcon(status);
-            return (
-              <View key={dept} style={styles.statusItem}>
-                <Ionicons name={name} size={24} color={color} style={styles.icon} />
-                <View style={styles.textContainer}>
-                  <Text style={styles.deptText}>{dept.toUpperCase()}</Text>
-                  <Text style={[styles.statusText, { color }]}>{status.toUpperCase()}</Text>
-                </View>
-              </View>
-            );
-          })}
-          <Text style={styles.overall}>
-            Overall Status: {clearance.overallStatus.toUpperCase()}
-          </Text>
-        </>
+        <Text style={styles.info}>Pay Academic obligations to request clearance.</Text>
       )}
+      {departments.map((dept) => (
+        <View key={dept.name} style={[styles.statusCard, dept.active && styles.activeCard]}>
+          <Ionicons
+            name={
+              dept.status === 'cleared'
+                ? 'checkmark-circle'
+                : dept.status === 'rejected'
+                ? 'close-circle'
+                : 'time-outline'
+            }
+            size={28}
+            color={
+              dept.status === 'cleared'
+                ? primaryColor
+                : dept.status === 'rejected'
+                ? secondaryColor
+                : textSecondary
+            }
+            style={styles.icon}
+          />
+          <View>
+            <Text style={styles.deptText}>{dept.name}</Text>
+            <Text style={styles.statusText}>{dept.status.toUpperCase()}</Text>
+            {dept.active && <Text style={styles.activeText}>Under Review</Text>}
+          </View>
+        </View>
+      ))}
+      <Text style={styles.overall}>
+        Overall Status: {clearedCount === total ? 'Cleared' : 'In Progress'}
+      </Text>
     </ScrollView>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, padding: 20, backgroundColor: '#f5f5f5' },
-  title: { fontSize: 28, fontWeight: 'bold', textAlign: 'center', marginBottom: 20 },
-  info: { fontSize: 16, textAlign: 'center', color: '#666', marginBottom: 20 },
-  progressContainer: { marginBottom: 20 },
-  progressText: { fontSize: 16, textAlign: 'center', marginBottom: 10, color: '#333' },
+  container: { flex: 1, backgroundColor, padding: 20 },
+  title: { fontSize: 28, fontWeight: 'bold', color: textColor, textAlign: 'center', marginVertical: 20 },
+  progressContainer: { marginBottom: 20, alignItems: 'center' },
+  progressText: { fontSize: 16, fontWeight: '600', color: textColor, marginBottom: 10 },
   progressBar: {
+    width: '100%',
     height: 10,
     backgroundColor: '#ddd',
     borderRadius: 5,
     overflow: 'hidden',
   },
-  progressFill: {
-    height: '100%',
-    backgroundColor: '#28a745',
-  },
-  statusItem: {
+  progressFill: { height: '100%', backgroundColor: primaryColor },
+  statusCard: {
     flexDirection: 'row',
     alignItems: 'center',
-    padding: 15,
     backgroundColor: '#fff',
-    borderRadius: 10,
+    borderRadius: 15,
+    padding: 15,
     marginBottom: 10,
-    elevation: 2,
+    elevation: 3,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
   },
+  activeCard: { borderWidth: 2, borderColor: primaryColor },
   icon: { marginRight: 15 },
-  textContainer: { flex: 1 },
-  deptText: { fontSize: 18, fontWeight: 'bold' },
-  statusText: { fontSize: 16, fontWeight: '500', marginTop: 2 },
-  overall: { fontSize: 20, fontWeight: 'bold', textAlign: 'center', marginTop: 20 },
-  errorContainer: { flex: 1, justifyContent: 'center', alignItems: 'center' },
-  errorTitle: { fontSize: 24, color: '#FF9933', marginBottom: 10 },
-  errorText: { fontSize: 16, color: '#666', marginBottom: 20 },
+  deptText: { fontSize: 18, fontWeight: 'bold', color: textColor },
+  statusText: { fontSize: 16, fontWeight: '500', color: textSecondary, marginTop: 2 },
+  activeText: { fontSize: 14, color: primaryColor, marginTop: 4 },
+  overall: { fontSize: 20, fontWeight: 'bold', color: textColor, textAlign: 'center', marginVertical: 20 },
+  currentDept: { fontSize: 16, color: textColor, textAlign: 'center', marginBottom: 10 },
+  info: { fontSize: 16, color: textSecondary, textAlign: 'center', marginBottom: 20 },
   loadingContainer: { flex: 1, justifyContent: 'center', alignItems: 'center' },
-  loadingText: { fontSize: 18, color: '#666', marginTop: 20 },
+  loadingText: { fontSize: 18, color: textSecondary, marginTop: 10 },
+  errorContainer: { flex: 1, justifyContent: 'center', alignItems: 'center' },
+  errorText: { fontSize: 16, color: textSecondary },
 });

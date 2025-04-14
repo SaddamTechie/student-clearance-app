@@ -143,7 +143,7 @@ function AdminPanel() {
             <option value="">All Departments</option>
             <option value="finance">Finance</option>
             <option value="library">Library</option>
-            <option value="academic">Academic</option>
+            <option value="academic">Academics</option>
             <option value="hostel">Hostel</option>
           </select>
           <ChevronDownIcon className="h-5 w-5 text-gray-500 absolute right-3 top-1/2 transform -translate-y-1/2 pointer-events-none" />
@@ -241,7 +241,7 @@ function AdminPanel() {
                 <option value="">Select Department</option>
                 <option value="finance">Finance</option>
                 <option value="library">Library</option>
-                <option value="academic">Academic</option>
+                <option value="academics">Academics</option>
                 <option value="hostel">Hostel</option>
               </select>
               <ChevronDownIcon className="h-5 w-5 text-gray-500 absolute right-3 top-1/2 transform -translate-y-1/2 pointer-events-none" />

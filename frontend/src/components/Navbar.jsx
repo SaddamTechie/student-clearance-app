@@ -30,13 +30,13 @@ const Navbar = () => {
               <Link to="/" className="hover:text-primary transition-colors">
                 Dashboard
               </Link>
+              <Link to="/reports" className="hover:text-primary transition-colors">
+                Reports
+              </Link>
             </>
           )}
           {role === 'staff' && (
             <>
-              <Link to="/reports" className="hover:text-primary transition-colors">
-                Reports
-              </Link>
               <Link to="/scan" className="hover:text-primary transition-colors">
                 Scan QR
               </Link>

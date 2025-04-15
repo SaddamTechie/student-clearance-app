@@ -28,13 +28,13 @@ export default function Index() {
         <Ionicons name="log-in" size={24} color="white" style={styles.buttonIcon} />
         <Text style={styles.buttonText}>Login</Text>
       </TouchableOpacity>
-      <TouchableOpacity
+      {/* <TouchableOpacity
         style={styles.button}
         onPress={() => router.push('/register')}
       >
         <Ionicons name="person-add" size={24} color="white" style={styles.buttonIcon} />
         <Text style={styles.buttonText}>Register</Text>
-      </TouchableOpacity>
+      </TouchableOpacity> */}
       <TouchableOpacity
         style={styles.learnMoreButton}
         onPress={() => router.push('/about')}

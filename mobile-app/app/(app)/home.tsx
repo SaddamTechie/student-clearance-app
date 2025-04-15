@@ -8,6 +8,7 @@ import {
   TextInput,
   Alert,
   ActivityIndicator,
+  RefreshControl,
 } from 'react-native';
 import axios from 'axios';
 import { apiUrl } from '../../config';
@@ -24,6 +25,7 @@ const textSecondary = '#666';
 export default function Home() {
   const [status, setStatus] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
   const [paymentData, setPaymentData] = useState({}); // { obligationId: { amount, phoneNumber } }
   const [paymentStatus, setPaymentStatus] = useState({}); // { obligationId: { type: 'success' | 'error', message: string } }
   const { session, signOut } = useSession();
@@ -94,6 +96,20 @@ export default function Home() {
       handleError(err, 'load clearance status', fetchStatus);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const onRefresh = async () => {
+    setRefreshing(true);
+    try {
+      const response = await axios.get(`${apiUrl}/status`, {
+        headers: { Authorization: `Bearer ${session}` },
+      });
+      setStatus(response.data);
+    } catch (err) {
+      handleError(err, 'refresh clearance status', onRefresh);
+    } finally {
+      setRefreshing(false);
     }
   };
 
@@ -224,7 +240,16 @@ export default function Home() {
       ?.obligations.every((ob) => ob.status === 'cleared') && !status.clearanceRequestStatus;
 
   return (
-    <ScrollView style={styles.container}>
+    <ScrollView
+      style={styles.container}
+      refreshControl={
+        <RefreshControl
+          refreshing={refreshing}
+          onRefresh={onRefresh}
+          tintColor={primaryColor}
+        />
+      }
+    >
       <Text style={styles.title}>Clearance Dashboard</Text>
       {paymentStatus.global && (
         <View

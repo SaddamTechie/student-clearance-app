@@ -43,7 +43,7 @@ function AppTabs() {
         tabBarIcon: ({ color, size }) => {
           let iconName;
           if (route.name === 'HomeTab') iconName = 'home';
-          else if (route.name === 'QR') iconName = 'qr-code';
+          // else if (route.name === 'QR') iconName = 'qr-code';
           else if (route.name === 'Status') iconName = 'reorder-three-sharp';
           else if (route.name === 'Notifications') iconName = 'notifications';
           else if (route.name === 'Profile') iconName = 'person';
@@ -71,7 +71,7 @@ function AppTabs() {
       <Tab.Screen name="Status" component={StatusScreen} />
       <Tab.Screen name="Notifications" component={NotificationsScreen} />
       {/* <Tab.Screen name="Notifications" component={HistoryScreen} /> */}
-      <Tab.Screen name="QR" component={QRScreen} />
+      {/* <Tab.Screen name="QR" component={QRScreen} /> */}
       {/* <Tab.Screen name="Certificate" component={CertificateScreen} /> */}
       {/* <Tab.Screen name="Report" component={ReportScreen} /> */}
       <Tab.Screen name="Profile" component={ProfileScreen} />

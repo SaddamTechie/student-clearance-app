@@ -1,4 +1,3 @@
-// mobile/screens/HomeScreen.tsx
 import React, { useState, useEffect } from 'react';
 import {
   View,
@@ -14,7 +13,7 @@ import axios from 'axios';
 import { apiUrl } from '../../config';
 import { useSession } from '../../ctx';
 import { Ionicons } from '@expo/vector-icons';
-import { useNavigation } from '@react-navigation/native';
+import { useRouter } from 'expo-router';
 
 const primaryColor = '#7ABB3B';
 const secondaryColor = '#FF9933';
@@ -22,36 +21,44 @@ const backgroundColor = '#f5f5f5';
 const textColor = '#333';
 const textSecondary = '#666';
 
-export default function HomeScreen() {
+export default function Home() {
   const [status, setStatus] = useState(null);
   const [loading, setLoading] = useState(true);
   const [paymentData, setPaymentData] = useState({}); // { obligationId: { amount, phoneNumber } }
-  const [paymentStatus, setPaymentStatus] = useState({}); // { obligationId: 'success' | null }
+  const [paymentStatus, setPaymentStatus] = useState({}); // { obligationId: { type: 'success' | 'error', message: string } }
   const { session, signOut } = useSession();
-  const navigation = useNavigation();
+  const router = useRouter();
 
   const handleError = (err, action = 'perform action', retryCallback = null) => {
-    let message = `Failed to ${action}`;
+    let message = `Unable to ${action}`;
     let buttons = [];
 
     if (err.response) {
       const { status: httpStatus, data } = err.response;
       if (httpStatus === 401) {
-        message = 'Session expired. Please log in again.';
+        message = 'Your session has expired. Please log in again.';
         buttons = [
           {
             text: 'OK',
             onPress: () => {
               signOut();
-              navigation.replace('Login');
+              router.replace('/login');
             },
           },
         ];
       } else if (httpStatus >= 400 && httpStatus < 500) {
-        message = data.message || `Invalid request: ${action}`;
+        if (data.errors && Array.isArray(data.errors)) {
+          message = data.errors.join('\n');
+        } else if (data.message) {
+          message = data.message;
+        } else if (data.details) {
+          message = data.details;
+        } else {
+          message = `${action.charAt(0).toUpperCase() + action.slice(1)} failed (Error ${httpStatus})`;
+        }
         buttons = [{ text: 'OK' }];
       } else if (httpStatus >= 500) {
-        message = `Server error: ${action}. Try again later.`;
+        message = `Server issue while trying to ${action}. Please try again later.`;
         buttons = retryCallback
           ? [
               { text: 'Retry', onPress: retryCallback },
@@ -60,7 +67,7 @@ export default function HomeScreen() {
           : [{ text: 'OK' }];
       }
     } else if (err.request) {
-      message = 'Network error. Please check your connection.';
+      message = `No response from server. Please check your internet connection and try again.`;
       buttons = retryCallback
         ? [
             { text: 'Retry', onPress: retryCallback },
@@ -68,11 +75,12 @@ export default function HomeScreen() {
           ]
         : [{ text: 'OK' }];
     } else {
-      message = `Error: ${err.message}`;
+      message = `Unexpected error: ${err.message}`;
       buttons = [{ text: 'OK' }];
     }
 
     Alert.alert('Error', message, buttons);
+    return message;
   };
 
   const fetchStatus = async () => {
@@ -83,7 +91,7 @@ export default function HomeScreen() {
       });
       setStatus(response.data);
     } catch (err) {
-      handleError(err, 'fetch status', fetchStatus);
+      handleError(err, 'load clearance status', fetchStatus);
     } finally {
       setLoading(false);
     }
@@ -96,9 +104,24 @@ export default function HomeScreen() {
         {},
         { headers: { Authorization: `Bearer ${session}` } }
       );
-      Alert.alert('Success', response.data.message, [{ text: 'OK', onPress: fetchStatus }]);
+      const successMessage = response.data.message || 'Clearance request submitted successfully';
+      setPaymentStatus((prev) => ({
+        ...prev,
+        global: { type: 'success', message: successMessage },
+      }));
+      setTimeout(() => {
+        setPaymentStatus((prev) => ({ ...prev, global: null }));
+      }, 5000);
+      Alert.alert('Success', successMessage, [{ text: 'OK', onPress: fetchStatus }]);
     } catch (err) {
-      handleError(err, 'request clearance', requestClearance);
+      const errorMessage = handleError(err, 'request clearance', requestClearance);
+      setPaymentStatus((prev) => ({
+        ...prev,
+        global: { type: 'error', message: errorMessage },
+      }));
+      setTimeout(() => {
+        setPaymentStatus((prev) => ({ ...prev, global: null }));
+      }, 5000);
     }
   };
 
@@ -109,39 +132,57 @@ export default function HomeScreen() {
     const balance = obligation ? obligation.amount - obligation.amountPaid : 0;
 
     if (!parsedAmount || parsedAmount <= 0) {
-      Alert.alert('Error', 'Enter a valid payment amount');
+      const errorMessage = 'Please enter a valid payment amount greater than 0';
+      setPaymentStatus((prev) => ({ ...prev, [obligationId]: { type: 'error', message: errorMessage } }));
+      Alert.alert('Error', errorMessage);
       return;
     }
     if (parsedAmount > balance) {
-      Alert.alert('Error', `Payment cannot exceed remaining balance of ${balance}`);
+      const errorMessage = `Payment cannot exceed remaining balance of ${balance}`;
+      setPaymentStatus((prev) => ({ ...prev, [obligationId]: { type: 'error', message: errorMessage } }));
+      Alert.alert('Error', errorMessage);
       return;
     }
-    if (!phoneNumber || !/^\+?\d{10,15}$/.test(phoneNumber)) {
-      Alert.alert('Error', 'Enter a valid phone number (10-15 digits)');
+    const cleanPhone = phoneNumber.replace(/^\+/, '');
+    if (!cleanPhone || !/^254[17]\d{8}$/.test(cleanPhone)) {
+      const errorMessage = 'Phone number must start with +2541 or +2547 followed by 8 digits (e.g., 254798765423)';
+      setPaymentStatus((prev) => ({ ...prev, [obligationId]: { type: 'error', message: errorMessage } }));
+      Alert.alert('Error', errorMessage);
       return;
     }
 
     try {
       const response = await axios.post(
         `${apiUrl}/pay-obligation`,
-        { obligationId, amount: parsedAmount, phoneNumber },
+        { obligationId, amount: parsedAmount, phoneNumber: cleanPhone },
         { headers: { Authorization: `Bearer ${session}` } }
       );
-      setPaymentStatus((prev) => ({ ...prev, [obligationId]: 'success' }));
+      const successMessage = response.data.message || `Paid ${parsedAmount} for ${obligation.type}`;
+      setPaymentStatus((prev) => ({
+        ...prev,
+        [obligationId]: { type: 'success', message: successMessage },
+      }));
       setTimeout(() => {
         setPaymentStatus((prev) => ({ ...prev, [obligationId]: null }));
-      }, 3000); // Clear success message after 3 seconds
-      Alert.alert('Success', response.data.message, [
+      }, 5000);
+      Alert.alert('Success', successMessage, [
         {
           text: 'OK',
           onPress: () => {
-            setPaymentData((prev) => ({ ...prev, [obligationId]: { amount: '', phoneNumber: '' } }));
+            setPaymentData((prev) => ({ ...prev, [obligationId]: { amount: '', phoneNumber: '+254' } }));
             fetchStatus();
           },
         },
       ]);
     } catch (err) {
-      handleError(err, 'make payment', () => payObligation(obligationId));
+      const errorMessage = handleError(err, 'process payment', () => payObligation(obligationId));
+      setPaymentStatus((prev) => ({
+        ...prev,
+        [obligationId]: { type: 'error', message: errorMessage },
+      }));
+      setTimeout(() => {
+        setPaymentStatus((prev) => ({ ...prev, [obligationId]: null }));
+      }, 5000);
     }
   };
 
@@ -161,7 +202,7 @@ export default function HomeScreen() {
   if (!status) {
     return (
       <View style={styles.errorContainer}>
-        <Text style={styles.errorText}>Unable to load data</Text>
+        <Text style={styles.errorText}>Unable to load clearance data</Text>
         <TouchableOpacity style={styles.retryButton} onPress={fetchStatus}>
           <Text style={styles.retryButtonText}>Retry</Text>
         </TouchableOpacity>
@@ -180,11 +221,33 @@ export default function HomeScreen() {
   const canRequestClearance =
     departments
       .find((d) => d.name === 'academics')
-      .obligations.every((ob) => ob.status === 'cleared') && !status.clearanceRequestStatus;
+      ?.obligations.every((ob) => ob.status === 'cleared') && !status.clearanceRequestStatus;
 
   return (
     <ScrollView style={styles.container}>
       <Text style={styles.title}>Clearance Dashboard</Text>
+      {paymentStatus.global && (
+        <View
+          style={[
+            styles.statusMessageContainer,
+            {
+              backgroundColor:
+                paymentStatus.global.type === 'success' ? '#E6F3D9' : '#FEE2E2',
+            },
+          ]}
+        >
+          <Text
+            style={[
+              styles.statusMessage,
+              {
+                color: paymentStatus.global.type === 'success' ? primaryColor : '#DC2626',
+              },
+            ]}
+          >
+            {paymentStatus.global.message}
+          </Text>
+        </View>
+      )}
       {departments.map((dept) => (
         <View key={dept.name} style={styles.card}>
           <View style={styles.cardHeader}>
@@ -215,11 +278,33 @@ export default function HomeScreen() {
                 <Text style={styles.obligationTitle}>{ob.type}</Text>
                 <Text style={styles.obligationDetail}>{ob.description}</Text>
                 <Text style={styles.obligationDetail}>
-                  Amount: {ob.amount} | Paid: {ob.amountPaid} | Balance: {ob.amount - ob.amountPaid} | Due:{' '}
-                  {new Date(ob.dueDate).toLocaleDateString()}
+                  Amount: {ob.amount} | Paid: {ob.amountPaid} | Balance:{' '}
+                  {ob.amount - ob.amountPaid} | Due: {new Date(ob.dueDate).toLocaleDateString()}
                 </Text>
-                {paymentStatus[ob._id] === 'success' && (
-                  <Text style={styles.successMessage}>Payment Successful!</Text>
+                {paymentStatus[ob._id] && (
+                  <View
+                    style={[
+                      styles.statusMessageContainer,
+                      {
+                        backgroundColor:
+                          paymentStatus[ob._id].type === 'success' ? '#E6F3D9' : '#FEE2E2',
+                      },
+                    ]}
+                  >
+                    <Text
+                      style={[
+                        styles.statusMessage,
+                        {
+                          color:
+                            paymentStatus[ob._id].type === 'success'
+                              ? primaryColor
+                              : '#DC2626',
+                        },
+                      ]}
+                    >
+                      {paymentStatus[ob._id].message}
+                    </Text>
+                  </View>
                 )}
                 {ob.status !== 'cleared' && (
                   <View style={styles.paymentContainer}>
@@ -237,18 +322,25 @@ export default function HomeScreen() {
                     />
                     <TextInput
                       style={styles.paymentInput}
-                      placeholder="Enter phone number"
+                      placeholder="+254"
                       keyboardType="phone-pad"
-                      value={paymentData[ob._id]?.phoneNumber || ''}
-                      onChangeText={(text) =>
+                      value={
+                        paymentData[ob._id]?.phoneNumber
+                          ? paymentData[ob._id].phoneNumber
+                          : '+254'
+                      }
+                      onChangeText={(text) => {
+                        if (!text.startsWith('+254')) {
+                          text = '+254';
+                        }
                         setPaymentData((prev) => ({
                           ...prev,
                           [ob._id]: { ...prev[ob._id], phoneNumber: text },
-                        }))
-                      }
+                        }));
+                      }}
                     />
                     <TouchableOpacity
-                      style={styles.payButton}
+                      style={[styles.payButton, { backgroundColor: secondaryColor }]}
                       onPress={() => payObligation(ob._id)}
                     >
                       <Text style={styles.payButtonText}>Pay</Text>
@@ -274,68 +366,154 @@ export default function HomeScreen() {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor, padding: 20 },
-  title: { fontSize: 28, fontWeight: 'bold', color: textColor, textAlign: 'center', marginVertical: 20 },
+  container: {
+    flex: 1,
+    backgroundColor,
+    padding: 20,
+  },
+  title: {
+    fontSize: 32,
+    fontWeight: '700',
+    color: textColor,
+    textAlign: 'center',
+    marginVertical: 24,
+    letterSpacing: 0.5,
+  },
   card: {
     backgroundColor: '#fff',
-    borderRadius: 15,
-    padding: 15,
-    marginBottom: 15,
-    elevation: 3,
+    borderRadius: 20,
+    padding: 20,
+    marginBottom: 20,
+    elevation: 5,
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.15,
+    shadowRadius: 8,
   },
-  cardHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
-  cardTitle: { fontSize: 18, fontWeight: 'bold', color: textColor },
-  cardStatus: { fontSize: 16, color: textSecondary, marginTop: 5 },
-  cardComment: { fontSize: 14, color: textSecondary, marginTop: 5, fontStyle: 'italic' },
-  obligation: { marginTop: 10, paddingTop: 10, borderTopWidth: 1, borderTopColor: '#eee' },
-  obligationTitle: { fontSize: 16, fontWeight: '600', color: textColor },
-  obligationDetail: { fontSize: 14, color: textSecondary, marginTop: 4 },
-  paymentContainer: { marginTop: 10 },
-  paymentInput: {
-    borderWidth: 1,
-    borderColor: '#ccc',
-    borderRadius: 8,
-    padding: 10,
-    marginBottom: 10,
-    fontSize: 14,
+  cardHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 12,
+  },
+  cardTitle: {
+    fontSize: 20,
+    fontWeight: '700',
     color: textColor,
   },
-  payButton: {
-    backgroundColor: secondaryColor,
-    padding: 12,
-    borderRadius: 8,
-    alignItems: 'center',
+  cardStatus: {
+    fontSize: 16,
+    fontWeight: '500',
+    color: textSecondary,
+    marginTop: 8,
   },
-  payButtonText: { color: '#fff', fontSize: 14, fontWeight: 'bold' },
-  noObligations: { fontSize: 14, color: textSecondary, marginTop: 10, textAlign: 'center' },
+  cardComment: {
+    fontSize: 14,
+    color: textSecondary,
+    marginTop: 8,
+    fontStyle: 'italic',
+  },
+  obligation: {
+    marginTop: 16,
+    paddingTop: 16,
+    borderTopWidth: 1,
+    borderTopColor: '#eee',
+  },
+  obligationTitle: {
+    fontSize: 18,
+    fontWeight: '600',
+    color: textColor,
+  },
+  obligationDetail: {
+    fontSize: 14,
+    color: textSecondary,
+    marginTop: 6,
+    lineHeight: 20,
+  },
+  paymentContainer: {
+    marginTop: 12,
+  },
+  paymentInput: {
+    borderWidth: 1,
+    borderColor: '#ddd',
+    borderRadius: 12,
+    padding: 14,
+    marginBottom: 12,
+    fontSize: 16,
+    color: textColor,
+    backgroundColor: '#fafafa',
+  },
+  payButton: {
+    padding: 16,
+    alignItems: 'center',
+    borderRadius: 12,
+  },
+  payButtonText: {
+    color: '#fff',
+    fontSize: 16,
+    fontWeight: '600',
+  },
+  noObligations: {
+    fontSize: 14,
+    color: textSecondary,
+    marginTop: 12,
+    textAlign: 'center',
+  },
   actionButton: {
     backgroundColor: primaryColor,
-    padding: 15,
-    borderRadius: 10,
+    padding: 16,
     alignItems: 'center',
-    marginVertical: 20,
+    borderRadius: 12,
+    marginVertical: 24,
   },
-  disabledButton: { backgroundColor: '#ccc', opacity: 0.6 },
-  actionButtonText: { color: '#fff', fontSize: 16, fontWeight: 'bold' },
-  loadingContainer: { flex: 1, justifyContent: 'center', alignItems: 'center' },
-  loadingText: { fontSize: 18, color: textSecondary, marginTop: 10 },
-  errorContainer: { flex: 1, justifyContent: 'center', alignItems: 'center' },
-  errorText: { fontSize: 16, color: textSecondary, marginBottom: 20 },
+  disabledButton: {
+    backgroundColor: '#ccc',
+    opacity: 0.6,
+  },
+  actionButtonText: {
+    color: '#fff',
+    fontSize: 18,
+    fontWeight: '600',
+  },
+  loadingContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  loadingText: {
+    fontSize: 18,
+    color: textSecondary,
+    marginTop: 12,
+  },
+  errorContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  errorText: {
+    fontSize: 16,
+    color: textSecondary,
+    marginBottom: 20,
+  },
   retryButton: {
     backgroundColor: primaryColor,
-    padding: 10,
-    borderRadius: 8,
+    padding: 16,
+    alignItems: 'center',
+    borderRadius: 12,
   },
-  retryButtonText: { color: '#fff', fontSize: 14, fontWeight: 'bold' },
-  successMessage: {
-    fontSize: 14,
-    color: primaryColor,
-    fontWeight: 'bold',
+  retryButtonText: {
+    color: '#fff',
+    fontSize: 16,
+    fontWeight: '600',
+  },
+  statusMessageContainer: {
+    padding: 12,
+    borderRadius: 10,
     marginTop: 8,
+  },
+  statusMessage: {
+    fontSize: 14,
+    fontWeight: '500',
     textAlign: 'center',
   },
 });

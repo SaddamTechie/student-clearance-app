@@ -8,8 +8,8 @@ dotenv.config();
 
 const students = [
   {
-    studentId: 'STU001',
-    email: 'student1@university.edu',
+    studentId: 'CT201/111801/22',
+    email: 'saddam@students.must.ac.ke',
     yearOfStudy: 4,
     obligations: [
       {
@@ -53,8 +53,8 @@ const students = [
     clearanceRequestDepartment: null,
   },
   {
-    studentId: 'STU002',
-    email: 'student2@university.edu',
+    studentId: 'CT201/111802/22',
+    email: 'obadiah@students.must.ac.ke',
     yearOfStudy: 4,
     obligations: [
       {
@@ -87,8 +87,8 @@ const students = [
     clearanceRequestDepartment: null,
   },
   {
-    studentId: 'STU003',
-    email: 'student3@university.edu',
+    studentId: 'CT201/109301/22',
+    email: 'sang@students.must.ac.ke',
     yearOfStudy: 2,
     obligations: [],
     clearanceStatus: [],

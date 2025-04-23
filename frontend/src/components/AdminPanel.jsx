@@ -97,7 +97,7 @@ function AdminPanel() {
       {/* Header */}
       <div className="flex justify-between items-center mb-6">
         <h1 className="text-3xl font-bold text-primary">Admin Panel</h1>
-        <div className="flex space-x-4">
+        {/* <div className="flex space-x-4">
           <button
             onClick={() => navigate('/profile')}
             className="flex items-center space-x-2 text-primary hover:text-secondary transition-colors"
@@ -112,7 +112,7 @@ function AdminPanel() {
             <ArrowLeftEndOnRectangleIcon className="h-6 w-6" />
             <span>Logout</span>
           </button>
-        </div>
+        </div> */}
       </div>
 
       {/* Add Staff Button */}

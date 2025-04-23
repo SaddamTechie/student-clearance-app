@@ -11,6 +11,7 @@ import ReportList from './components/ReportList';
 import QRScanner from './components/QRScanner';
 import StaffDashboard from './components/StaffDashboard';
 import Notifications from './components/Notifications';
+import Students from './components/Students';
 
 export const apiUrl = import.meta.env.VITE_API_URL;
 export const socketUrl = import.meta.env.VITE_SOCKET_URL;
@@ -57,6 +58,10 @@ function App() {
                 <Route
                   path="/reports"
                   element={authContext.isAuthenticated ? <ReportList /> : <Navigate to="/login" />}
+                />
+                <Route
+                  path="/students"
+                  element={authContext.isAuthenticated ? <Students/> : <Navigate to="/login" />}
                 />
                 <Route
                   path="/scan"

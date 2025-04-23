@@ -318,6 +318,42 @@ router.get('/staff/list', authMiddleware, roleMiddleware(['admin']), async (req,
   }
 });
 
+// GET /admin/students
+router.get('/students', authMiddleware,roleMiddleware(['admin']), async (req, res) => {
+  try {
+    // Get year filter (optional)
+    const { year } = req.query;
+    const query = year ? { yearOfStudy: parseInt(year) } : {};
+
+    // Validate year
+    if (year && ![1, 2, 3, 4].includes(parseInt(year))) {
+      return res.status(400).json({
+        message: 'Invalid year',
+        errors: ['Year must be 1, 2, 3, or 4'],
+      });
+    }
+
+    // Fetch students
+    const students = await Student.find(query).sort({ studentId: 1 });
+    res.json({
+      students: students.map((student) => ({
+        studentId: student.studentId,
+        email: student.email,
+        yearOfStudy: student.yearOfStudy,
+        overallStatus: student.clearanceStatus.every((cs) => cs.status === 'cleared')
+          ? 'cleared'
+          : 'not cleared',
+      })),
+    });
+  } catch (error) {
+    console.error('Error fetching students:', error);
+    res.status(500).json({
+      message: 'Failed to fetch students',
+      errors: [error.message || 'Internal server error'],
+    });
+  }
+});
+
 
 
 //Delete Staff
@@ -516,6 +552,7 @@ router.get('/qr', authMiddleware,async (req, res) => {
 // Post Report 
 router.post('/report', authMiddleware, async (req, res) => {
   const { department, message } = req.body;
+  const io = req.app.get('io');
   const studentId = req.user.id;
 
   if (!department || !message) {
@@ -529,7 +566,10 @@ router.post('/report', authMiddleware, async (req, res) => {
       message,
     });
     await report.save();
-    console.log(`Report from student ${studentId} to ${department}: ${message}`);
+    const staff = await Staff.find({ role: "admin" });
+    staff.forEach(async (s) => {
+      await sendNotification(io, s._id.toString(), `New issue reported by student ${studentId} for ${department}`);
+    });
     res.status(201).json({ message: 'Report submitted successfully' });
   } catch (error) {
     console.error('Error saving report:', error);
@@ -560,6 +600,9 @@ router.patch('/report/:id', authMiddleware, async (req, res) => {
   }
   const { id } = req.params;
   const { status } = req.body;
+  const io = req.app.get('io');
+
+
 
   if (!['pending', 'resolved'].includes(status)) {
     return res.status(400).json({ message: 'Invalid status' });
@@ -570,6 +613,8 @@ router.patch('/report/:id', authMiddleware, async (req, res) => {
     if (!report) return res.status(404).json({ message: 'Report not found' });
     report.status = status;
     await report.save();
+    const studentId = await Student.findOne({ studentId: report.studentId });
+    await sendNotification(io, studentId, 'Your report has been updated to ' + status);
     res.json(report);
   } catch (error) {
     console.error('Error updating report:', error);
@@ -669,6 +714,10 @@ router.post('/request-clearance', authMiddleware, async (req, res) => {
         'Clearance Request'
       );
     }
+    const staff = await Staff.find({ department: "academics" });
+    staff.forEach(async (s) => {
+      await sendNotification(io, s._id.toString(), `New clearance request from ${studentId} for academics.`);
+    });
     console.log('Request submitted', req.user);
     res.json({ message: 'Clearance request submitted to Academics' });
   } catch (err) {
@@ -776,10 +825,22 @@ router.post('/staff/update-clearance', authMiddleware, async (req, res) => {
     student.clearanceHistory.push({ department, status, comment });
     if (status === 'cleared' && department === 'academics') {
       student.clearanceRequestDepartment = 'finance'; // Move to next department
+      const staff = await Staff.find({ department: "finance" });
+      staff.forEach(async (s) => {
+      await sendNotification(io, s._id.toString(), `New clearance request from ${studentId} for finance.`);
+    });
     } else if (status === 'cleared' && department === 'finance') {
       student.clearanceRequestDepartment = 'library';
+      const staff = await Staff.find({ department: "library" });
+      staff.forEach(async (s) => {
+      await sendNotification(io, s._id.toString(), `New clearance request from ${studentId} for library.`);
+    });
     } else if (status === 'cleared' && department === 'library') {
       student.clearanceRequestDepartment = 'hostel';
+      const staff = await Staff.find({ department: "hostel" });
+      staff.forEach(async (s) => {
+      await sendNotification(io, s._id.toString(), `New clearance request from ${studentId} for hostel.`);
+    });
     } else if (status === 'cleared' && department === 'hostel') {
       student.clearanceRequestStatus = 'approved';
       student.clearanceRequestDepartment = null;

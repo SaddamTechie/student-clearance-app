@@ -87,13 +87,13 @@ function Profile() {
             <ArrowLeftIcon className="h-6 w-6" />
             <span>Back</span>
           </button>
-          <button
+          {/* <button
             onClick={handleLogout}
             className="flex items-center space-x-2 text-primary hover:text-secondary transition-colors"
           >
             <ArrowLeftEndOnRectangleIcon className="h-6 w-6" />
             <span>Logout</span>
-          </button>
+          </button> */}
         </div>
       </div>
 

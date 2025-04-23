@@ -80,7 +80,7 @@ export default function LoginScreen() {
           />
         </View>
       </View>
-      <Text style={styles.forgotPassword}>Forgot Password?</Text>
+      {/* <Text style={styles.forgotPassword}>Forgot Password?</Text> */}
       {loading ? (
         <ActivityIndicator size="large" color="#7ABB3B" style={styles.loading} />
       ) : (
@@ -91,15 +91,6 @@ export default function LoginScreen() {
           color="#7ABB3B"
         />
       )}
-      <View style={styles.registerLink}>
-        <Text style={styles.registerText}>Don't have an account?</Text>
-        <Text
-          style={styles.signUpLink}
-          onPress={() => router.push('/register')}
-        >
-          Sign Up
-        </Text>
-      </View>
     </View>
   );
 }

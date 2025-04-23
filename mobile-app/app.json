@@ -9,6 +9,12 @@
     "scheme": "myapp",
     "userInterfaceStyle": "automatic",
     "newArchEnabled": true,
+    "androidStatusBar": {
+      "backgroundColor": "#ffffff",
+      "barStyle": "dark-content",
+      "translucent": false,
+      "hidden": false
+    },
     "ios": {
       "supportsTablet": true
     },

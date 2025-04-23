@@ -28,6 +28,8 @@ export default function Home() {
   const [refreshing, setRefreshing] = useState(false);
   const [paymentData, setPaymentData] = useState({}); // { obligationId: { amount, phoneNumber } }
   const [paymentStatus, setPaymentStatus] = useState({}); // { obligationId: { type: 'success' | 'error', message: string } }
+  const [showPayInputs, setShowPayInputs] = useState({}); // { obligationId: boolean }
+  const [processingPayment, setProcessingPayment] = useState({}); // { obligationId: boolean }
   const { session, signOut } = useSession();
   const router = useRouter();
 
@@ -141,6 +143,22 @@ export default function Home() {
     }
   };
 
+  const togglePaymentInputs = (obligationId) => {
+    // Initialize the payment data with defaults if not already set
+    if (!paymentData[obligationId]) {
+      setPaymentData((prev) => ({
+        ...prev,
+        [obligationId]: { amount: '', phoneNumber: '+254' },
+      }));
+    }
+    
+    // Toggle the visibility of payment inputs
+    setShowPayInputs((prev) => ({
+      ...prev,
+      [obligationId]: !prev[obligationId],
+    }));
+  };
+
   const payObligation = async (obligationId) => {
     const { amount, phoneNumber } = paymentData[obligationId] || {};
     const parsedAmount = parseFloat(amount || '0');
@@ -167,6 +185,9 @@ export default function Home() {
       return;
     }
 
+    // Set processing state to true for this obligation
+    setProcessingPayment((prev) => ({ ...prev, [obligationId]: true }));
+
     try {
       const response = await axios.post(
         `${apiUrl}/pay-obligation`,
@@ -186,6 +207,8 @@ export default function Home() {
           text: 'OK',
           onPress: () => {
             setPaymentData((prev) => ({ ...prev, [obligationId]: { amount: '', phoneNumber: '+254' } }));
+            // Hide payment inputs after successful payment
+            setShowPayInputs((prev) => ({ ...prev, [obligationId]: false }));
             fetchStatus();
           },
         },
@@ -199,6 +222,9 @@ export default function Home() {
       setTimeout(() => {
         setPaymentStatus((prev) => ({ ...prev, [obligationId]: null }));
       }, 5000);
+    } finally {
+      // Reset processing state
+      setProcessingPayment((prev) => ({ ...prev, [obligationId]: false }));
     }
   };
 
@@ -235,9 +261,10 @@ export default function Home() {
   }));
 
   const canRequestClearance =
-    departments
-      .find((d) => d.name === 'academics')
-      ?.obligations.every((ob) => ob.status === 'cleared') && !status.clearanceRequestStatus;
+  // Check that all obligations across all departments are cleared
+  status.obligations.every((ob) => ob.status === 'cleared') && 
+  // And ensure there's no existing clearance request
+  !status.clearanceRequestStatus;
 
   return (
     <ScrollView
@@ -333,43 +360,69 @@ export default function Home() {
                 )}
                 {ob.status !== 'cleared' && (
                   <View style={styles.paymentContainer}>
-                    <TextInput
-                      style={styles.paymentInput}
-                      placeholder="Enter amount"
-                      keyboardType="numeric"
-                      value={paymentData[ob._id]?.amount || ''}
-                      onChangeText={(text) =>
-                        setPaymentData((prev) => ({
-                          ...prev,
-                          [ob._id]: { ...prev[ob._id], amount: text },
-                        }))
-                      }
-                    />
-                    <TextInput
-                      style={styles.paymentInput}
-                      placeholder="+254"
-                      keyboardType="phone-pad"
-                      value={
-                        paymentData[ob._id]?.phoneNumber
-                          ? paymentData[ob._id].phoneNumber
-                          : '+254'
-                      }
-                      onChangeText={(text) => {
-                        if (!text.startsWith('+254')) {
-                          text = '+254';
-                        }
-                        setPaymentData((prev) => ({
-                          ...prev,
-                          [ob._id]: { ...prev[ob._id], phoneNumber: text },
-                        }));
-                      }}
-                    />
-                    <TouchableOpacity
-                      style={[styles.payButton, { backgroundColor: secondaryColor }]}
-                      onPress={() => payObligation(ob._id)}
-                    >
-                      <Text style={styles.payButtonText}>Pay</Text>
-                    </TouchableOpacity>
+                    {showPayInputs[ob._id] ? (
+                      <>
+                        <TextInput
+                          style={styles.paymentInput}
+                          placeholder="Enter amount"
+                          keyboardType="numeric"
+                          value={paymentData[ob._id]?.amount || ''}
+                          onChangeText={(text) =>
+                            setPaymentData((prev) => ({
+                              ...prev,
+                              [ob._id]: { ...prev[ob._id], amount: text },
+                            }))
+                          }
+                        />
+                        <TextInput
+                          style={styles.paymentInput}
+                          placeholder="+254"
+                          keyboardType="phone-pad"
+                          value={
+                            paymentData[ob._id]?.phoneNumber
+                              ? paymentData[ob._id].phoneNumber
+                              : '+254'
+                          }
+                          onChangeText={(text) => {
+                            if (!text.startsWith('+254')) {
+                              text = '+254';
+                            }
+                            setPaymentData((prev) => ({
+                              ...prev,
+                              [ob._id]: { ...prev[ob._id], phoneNumber: text },
+                            }));
+                          }}
+                        />
+                        <TouchableOpacity
+                          style={[styles.payButton, { backgroundColor: processingPayment[ob._id] ? '#ccc' : secondaryColor }]}
+                          onPress={() => payObligation(ob._id)}
+                          disabled={processingPayment[ob._id]}
+                        >
+                          {processingPayment[ob._id] ? (
+                            <View style={styles.loadingButtonContent}>
+                              <ActivityIndicator size="small" color="#fff" />
+                              <Text style={[styles.payButtonText, {marginLeft: 8}]}>Processing...</Text>
+                            </View>
+                          ) : (
+                            <Text style={styles.payButtonText}>Confirm Payment</Text>
+                          )}
+                        </TouchableOpacity>
+                        <TouchableOpacity
+                          style={[styles.cancelButton]}
+                          onPress={() => togglePaymentInputs(ob._id)}
+                          disabled={processingPayment[ob._id]}
+                        >
+                          <Text style={styles.cancelButtonText}>Cancel</Text>
+                        </TouchableOpacity>
+                      </>
+                    ) : (
+                      <TouchableOpacity
+                        style={[styles.payButton, { backgroundColor: secondaryColor }]}
+                        onPress={() => togglePaymentInputs(ob._id)}
+                      >
+                        <Text style={styles.payButtonText}>Pay</Text>
+                      </TouchableOpacity>
+                    )}
                   </View>
                 )}
               </View>
@@ -472,11 +525,29 @@ const styles = StyleSheet.create({
     padding: 16,
     alignItems: 'center',
     borderRadius: 12,
+    marginBottom: 10,
   },
   payButtonText: {
     color: '#fff',
     fontSize: 16,
     fontWeight: '600',
+  },
+  cancelButton: {
+    padding: 16,
+    alignItems: 'center',
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: '#ccc',
+  },
+  cancelButtonText: {
+    color: textSecondary,
+    fontSize: 16,
+    fontWeight: '600',
+  },
+  loadingButtonContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   noObligations: {
     fontSize: 14,

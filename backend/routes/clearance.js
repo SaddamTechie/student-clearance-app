@@ -1,6 +1,7 @@
 const admin = require('firebase-admin');
 const express = require('express');
 const router = express.Router();
+const fs = require('fs');
 const Student = require('../models/Student');
 const Staff = require('../models/Staff');
 const Report = require('../models/Report');
@@ -868,6 +869,54 @@ router.post('/staff/update-clearance', authMiddleware, async (req, res) => {
 });
 
 
+
+router.get('/certificate',authMiddleware, async (req, res) => {
+  try {
+    const studentId = req.user.id;
+    if (!studentId) {
+      return res.status(400).json({ message: 'Student ID is required' });
+    }
+
+    // Fetch student from DB 
+    const student = await Student.findOne({ studentId });
+    if (!student) {
+      return res.status(404).json({ message: 'Student not found' });
+    }
+
+    // Verify clearance status
+    const isCleared = student.clearanceStatus.every((cs) => cs.status === 'cleared');
+    if (!isCleared) {
+      return res.status(403).json({ message: 'Student has not cleared all departments' });
+    }
+
+    const certificatePath = await generateCertificate(student);
+
+    // Verify file exists and is not empty
+    const stats = fs.statSync(certificatePath);
+    if (stats.size === 0) {
+      throw new Error('PDF is empty after generation!');
+    }
+
+    // Stream the file
+    res.setHeader('Content-Type', 'application/pdf');
+    res.setHeader('Content-Disposition', `attachment; filename="${student.studentId}_clearance.pdf"`);
+    res.setHeader('Content-Length', stats.size);
+
+    const fileStream = fs.createReadStream(certificatePath);
+    fileStream.pipe(res);
+
+    // Delete file after streaming finishes
+    res.on('finish', () => {
+      fs.unlink(certificatePath, (err) => {
+        if (err) console.error('Cleanup error:', err);
+      });
+    });
+
+  } catch (error) {
+    console.error('Error:', error);
+    res.status(500).json({ message: 'Failed to generate certificate' });
+  }
+});
 
 
 module.exports = router;

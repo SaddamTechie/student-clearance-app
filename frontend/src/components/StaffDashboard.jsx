@@ -94,7 +94,7 @@ const StaffDashboard = () => {
         <div className="bg-red-100 text-red-700 p-4 rounded-md mb-6">{error}</div>
       )}
 
-      <div className="mb-6">
+      {/* <div className="mb-6">
         <label className="block text-gray-700 font-semibold mb-2">Filter by Status</label>
         <div className="relative">
           <select
@@ -109,7 +109,7 @@ const StaffDashboard = () => {
           </select>
           <ChevronDownIcon className="h-5 w-5 text-gray-500 absolute right-3 top-1/2 transform -translate-y-1/2 pointer-events-none" />
         </div>
-      </div>
+      </div> */}
 
       <div className="bg-white shadow-md rounded-lg overflow-hidden">
         {loading ? (
@@ -120,7 +120,7 @@ const StaffDashboard = () => {
                 <th className="p-3 text-left">Status</th>
                 <th className="p-3 text-left">Eligibility</th>
                 <th className="p-3 text-left">Obligations</th>
-                <th className="p-3 text-left">History</th>
+                {/* <th className="p-3 text-left">History</th> */}
                 <th className="p-3 text-left">Actions</th>
               </tr>
             </thead>
@@ -147,7 +147,7 @@ const StaffDashboard = () => {
                 <th className="p-3 text-left">Status</th>
                 <th className="p-3 text-left">Eligibility</th>
                 <th className="p-3 text-left">Obligations</th>
-                <th className="p-3 text-left">History</th>
+                {/* <th className="p-3 text-left">History</th> */}
                 <th className="p-3 text-left">Actions</th>
               </tr>
             </thead>
@@ -176,7 +176,7 @@ const StaffDashboard = () => {
                           : 'text-red-600'
                       }`}
                     >
-                      {req.clearanceEligibility}
+                      {req.clearanceEligibility === 'Cleared' ? 'Yes' : 'Not Eligible'}
                     </span>
                   </td>
                   <td className="p-3">
@@ -189,7 +189,7 @@ const StaffDashboard = () => {
                           .join(', ')
                       : 'None'}
                   </td>
-                  <td className="p-3">
+                  {/* <td className="p-3">
                     <button
                       onClick={() => toggleHistory(req.studentId)}
                       className="text-primary hover:text-secondary transition-colors"
@@ -212,7 +212,7 @@ const StaffDashboard = () => {
                         )}
                       </div>
                     )}
-                  </td>
+                  </td> */}
                   <td className="p-3">
                     <button
                       onClick={() => setSelectedRequest({ ...req, department: req.department })}
@@ -245,7 +245,7 @@ const StaffDashboard = () => {
                       : 'text-red-600'
                   }`}
                 >
-                  {selectedRequest.clearanceEligibility}
+                  {selectedRequest.clearanceEligibility === 'Cleared'? 'Yes' : 'Not Eligible'}
                 </span>
               </p>
               <p><span className="font-semibold text-gray-700">Comment:</span> {selectedRequest.comment || 'None'}</p>

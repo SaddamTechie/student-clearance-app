@@ -1,123 +1,256 @@
-# Clearance System
+# Student Clearance System
 
-A full-stack application designed to streamline student clearance processes across departments. The system comprises a Node.js/Express backend, a React-based admin frontend, and a React Native mobile app (Expo), providing a seamless experience for staff, admins, and students.
+A modern, full-stack application for managing student clearance processes in Meru University of Science & Technology. The system provides an **admin dashboard** for managing students and staff, a **staff dashboard** for handling clearance requests, and a **mobile app** for students to track their clearance status and download certificates.
 
-Table of Contents
-Features
-Backend:
-RESTful API with JWT authentication.
-Real-time notifications via Socket.IO.
-MongoDB integration for data persistence.
-Role-based access (admin, staff, student).
-Admin Frontend (React):
-Responsive dashboard for staff and admins.
-Manage staff (CRUD), view reports, scan QR codes, handle clearance requests, and update profiles.
-Real-time notification system with filtering and read status.
-Theme: Green (#7ABB3B) and Orange (#FF9933).
-Mobile App (React Native - Expo):
-Student-facing app to generate QR codes for clearance.
-View clearance status and obligations.
-Receive push notifications for updates.
-Tech Stack
-Backend: Node.js, Express, MongoDB, Socket.IO, JWT
-Frontend (Admin): React, Tailwind CSS, React Router, Axios, Sonner (toasts), Heroicons
-Mobile App: React Native, Expo, Axios, Expo Notifications
-Tools: Vite (frontend build), Nodemon (backend dev), Git
+---
+
+## Table of Contents
+
+- Features
+- Tech Stack
+- Installation
+  - Prerequisites
+  - Backend Setup
+  - Frontend Setup
+  - Mobile App Setup
+- Usage
+  - Admin Dashboard
+  - Staff Dashboard
+  - Student Mobile App
+- API Endpoints
+
+---
+
+## Features
+
+### Admin Dashboard (Web)
+
+- View and filter students by year to check clearance status.
+- Manage staff accounts (add/delete).
+- Responsive design with Tailwind CSS.
+- Error handling with `sonner` toasts.
+
+### Staff Dashboard (Web)
+
+- View clearance requests.
+- Approve or reject student clearance requests with comments.
+- View student obligations.
+- Mobile-friendly card layout for small screens.
+
+### Student Mobile App
+
+- View real-time clearance status across departments (e.g., finance, library).
+- Download clearance certificates as PDFs.
+- Generate QR code.
+- Push notifications.
+- User-friendly interface built with React Native and Expo.
+
+### Backend
+
+- Secure API with JWT authentication.
+- MongoDB for storing student, staff, and clearance data.
+- PDF generation for clearance certificates using PDFKit.
+- Server-side filtering and validation.
+
+---
+
+## Tech Stack
+
+| Component    | Technologies                                                |
+| ------------ | ----------------------------------------------------------- |
+| **Backend**  | Node.js, Express, MongoDB, JWT, PDFKit                      |
+| **Frontend** | React, React Router, Axios, Tailwind CSS, Sonner, Heroicons |
+| **Mobile**   | React Native, Expo, Axios                                   |
+| **Database** | MongoDB                                                     |
+| **Tools**    | Git, npm, VS Code, Postman, EAS Build                       |
+
+---
+
+## Installation
 
 ### Prerequisites
 
-- Node.js (v16+)
-- MongoDB (local or Atlas)
-- npm (v8+)
-  Expo CLI (for mobile app: npm install -g expo-cli)
+- **Node.js** (v16 or higher)
+- **MongoDB** (local or Atlas)
+- **Git**
+- **Expo CLI** (for mobile app)
+- **Postman** (optional, for API testing)
 
+Clone the repository:
+
+```bash
 git clone https://github.com/SaddamTechie/student-clearance-app.git
-cd clearance-system/backend
+cd student-clearance-app
+```
 
-npm install
-Set Environment Variables: Create a .env file in backend/:
+### Backend Setup
 
-PORT=5000
-MONGODB_URI=mongodb://localhost:27017/clearance_db
-SECRET_KEY=your_jwt_secret
-Run MongoDB:
-Local: mongod
-Atlas: Use your connection string in .env.
-Start the Server:
-bash
+1. Navigate to the backend folder:
 
-Collapse
+   ```bash
+   cd backend
+   ```
 
-Wrap
+2. Install dependencies:
 
-Copy
-npm run dev # Uses Nodemon for development
-Server runs at http://localhost:5000.
-Frontend (Admin) Setup
-Navigate to Frontend:
+   ```bash
+   npm install
+   ```
 
-cd clearance-system/frontend
-Install Dependencies:
+3. Create a `.env` file:
 
-npm install
-Set Environment Variables: Create a .env file in frontend/:
-text
+   ```env
+   MONGO_URI=<Your_MONGO_URI>
+   PORT=5000
+   SECRET_KEY=<JWT_SECRET_KEY>
+   EMAIL_USER=<Your_Email>
+   EMAIL_PASS=<Your_Email_Password>
+   FIREBASE_SERVICE_ACCOUNT=<Your_Firebase_Service_Account_Configuration>
+   CONSUMER_KEY=<Your_Mpesa_Consumer_Key>
+   CONSUMER_SECRET=<Your_Mpesa_Consumer_Secret>
+   PASS_KEY=<Your_Mpesa_Pass_Key>
+   SHORT_CODE=<Your_Mpesa_Short_Code>
+   ```
 
-VITE_API_URL=http://localhost:5000/api/clearance
-Start the Development Server:
+4. Start MongoDB (if local):
 
-npm run dev
-Frontend runs at http://localhost:5173.
-Mobile App Setup
-Navigate to Mobile:
+   ```bash
+   mongod
+   ```
 
-cd clearance-system/mobile
-Install Dependencies:
-Set Environment Variables: Update api.js or use Expo config:
-const API_URL = 'http://localhost:5000/api/clearance'; // Adjust for production
+   Prefer using Mongodb Atlas on Cloud.
 
-Start the Expo App:
+5. Seed initial data:
+
+```bash
+ node utils/seed.js
+```
+
+6. Start the backend:
+
+   ```bash
+   npm start
+   ```
+
+   The API will run at `http://localhost:5000`.
+
+### Frontend Setup
+
+1. Navigate to the frontend folder:
+
+   ```bash
+   cd frontend
+   ```
+
+2. Install dependencies:
+
+   ```bash
+   npm install
+   ```
+
+3. Create `.env` file and update with the backend URL:
+
+   ```.env
+   VITE_API_URL=http://localhost:5000/api/clearance
+   VITE_SOCKET_URL=http://localhost:5000
+   ```
+
+4. Start the frontend:
+
+   ```bash
+   npm run dev
+   ```
+
+   The admin dashboard will run at `http://localhost:5173`.
+
+### Mobile App Setup
+
+1. Navigate to the mobile app folder:
+
+   ```bash
+   cd mobile-app
+   ```
+
+2. Install dependencies:
+
+   ```bash
+   npm install
+   ```
+
+3. Update API URL in `config.js`:
+
+   ```javascript
+   export const apiUrl = "http://localhost:5000/api/clearance";
+   export const socketUrl = "http://localhost:5000";
+   ```
+
+4. Start the Expo development server:
+
+```bash
 npx expo start
-Scan the QR code with the Expo Go app (iOS/Android) or run on an emulator.
-Usage
-Backend:
-API serves endpoints for authentication, staff management, clearance requests, and notifications.
-Socket.IO broadcasts real-time updates (e.g., new clearance requests).
-Admin Frontend:
-Log in with staff/admin credentials.
-Navigate via the Navbar to manage staff, view reports, scan QR codes, handle requests, or check notifications.
-Refreshing pages retains the current route.
-Mobile App:
-Log in as a student.
-View clearance status or generate a QR code for staff to scan.
-Receive push notifications for status updates.
-Example Workflow
-Admin: Registers staff via /admin panel.
-Staff: Scans a student’s QR code at /scan, updates clearance at /requests.
-Student: Checks status on mobile app, gets notified of updates.
-API Endpoints
-Authentication
-POST /api/clearance/login: Authenticate user (returns JWT).
-GET /api/clearance/me: Get current user info.
-Staff/Admin
-POST /api/clearance/staff/register: Register new staff (admin only).
-GET /api/clearance/staff/list: List all staff (admin only).
-DELETE /api/clearance/staff/:id: Delete staff (admin only).
-PUT /api/clearance/staff/password: Update staff password.
-GET /api/clearance/staff/requests: Get clearance requests for staff’s department.
-POST /api/clearance/staff/update-clearance: Update clearance status.
-Reports
-GET /api/clearance/reports: Get department reports.
-PATCH /api/clearance/report/:id: Update report status.
-Notifications
-GET /api/clearance/notifications: Get user notifications.
-PATCH /api/clearance/notifications/:id/read: Mark notification as read.
-QR Verification
-POST /api/clearance/verify: Verify student QR code.
+```
 
-Assumptions
-We assume that the staff and students are already registered in the school sysytem and have already been issued with emails. But because we don't have access to the system to login students or staff and get their data, we opted to register them to generate the data we need.
+or
 
-Analytics: Add to staff dashboard later with a /staff/stats endpoint. Messaging: Expand with a /staff/message endpoint and UI. Full Dashboard: Integrate StaffDashboard into your admin panel’s routing
+```bash
+npx expo start --tunnel # To avoid network issues(access it from different network)
+```
 
-Card for all departments with a label 'Resolved' or 'Not Resolved' and I can click into the specific department,see the obligations for that department,then I can maybe pay for them and after all gets resolved,I can go back and even the label on that department card woould have changed to resolved,and when all the obligations on all departments are resolved is when I can be able to send the Request.
+5. Scan the QR code with the Expo Go app (iOS/Android) or run on an emulator.
+
+---
+
+## Usage
+
+### Admin Dashboard
+
+- **URL**: `http://localhost:5173`
+- **Login**: Use admin credentials (e.g., email: `admin@example.com`).
+- **Features**:
+  - **Students**: View/filter students by year, check clearance status.
+  - **Staff**: Add/delete staff members.
+  - Navigate via `/students` or `/` for staff.
+  - View issues reported by students.
+
+### Staff Dashboard
+
+- **URL**: `http://localhost:5173/`
+- **Login**: Use staff credentials.
+- **Features**:
+  - View clearance requests.
+  - Approve/reject requests with comments.
+  - Check student obligations.
+  - Scan QR code
+
+### Student Mobile App
+
+- **Launch**: Open via Expo Go or build APK/iOS app.
+- **Login**: Use student credentials.
+- **Features**:
+  - View clearance status per department.
+  - Download clearance certificate if fully cleared.
+  - Generate QR code for verification
+  - Get push notification updates
+  - Report issues to administration
+
+---
+
+## API Endpoints
+
+| Method | Endpoint                      | Description                       | Auth Required |
+| ------ | ----------------------------- | --------------------------------- | ------------- |
+| GET    | `/admin/students?year=<year>` | List students, filter by year     | Admin         |
+| POST   | `/staff/register`             | Register new staff                | Admin         |
+| DELETE | `/staff/:staffId`             | Delete staff                      | Admin         |
+| GET    | `/staff/requests`             | List clearance requests for staff | Staff         |
+| POST   | `/staff/update-clearance`     | Update clearance request status   | Staff         |
+| GET    | `/certificate`                | Download clearance certificate    | Student       |
+| POST   | `/login`                      | Authenticate user                 | None          |
+
+**Example Request**:
+
+```bash
+curl -H "Authorization: Bearer <token>" "http://localhost:5000/certificate" -o certificate.pdf
+```
+
+---

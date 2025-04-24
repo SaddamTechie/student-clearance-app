@@ -185,7 +185,12 @@ export default function ProfileScreen() {
           </View>
         );
       case 'qr':
-        return <QRScreen />;
+        try {
+          return <QRScreen /* ... */ />;
+        } catch (e) {
+          console.error("QR rendering failed:", e);
+          return <Text>QR Code unavailable</Text>;
+        }
       case 'certificate':
         return <CertificateScreen />;
       case 'report':

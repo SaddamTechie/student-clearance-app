@@ -6,9 +6,8 @@ import {
   ActivityIndicator,
   TouchableOpacity,
   Alert,
+  Linking,
 } from 'react-native';
-import * as FileSystem from 'expo-file-system';
-import * as Sharing from 'expo-sharing';
 import axios from 'axios';
 import { apiUrl } from '../../config';
 import { useSession } from '@/ctx';
@@ -49,52 +48,54 @@ export default function CertificateScreen() {
       });
       setStatus(response.data);
     } catch (err) {
-      let message = 'Failed to load clearance status';
-      if (err.response) {
-        const { status: httpStatus, data } = err.response;
-        if (httpStatus === 401) {
-          message = 'Session expired. Please log in again.';
-          Alert.alert('Error', message, [
-            {
-              text: 'OK',
-              onPress: () => {
-                signOut();
-                router.replace('/login');
-              },
-            },
-          ]);
-          return;
-        } else if (data.message) {
-          message = data.message;
-        } else if (data.errors) {
-          message = data.errors.join('\n');
-        }
-      } else if (err.request) {
-        message = 'Network error. Please check your connection.';
-      }
-      setError(message);
-      Alert.alert('Error', message, [
-        { text: 'Retry', onPress: fetchStatus },
-        { text: 'Cancel' },
-      ]);
+      handleFetchError(err);
     } finally {
       setLoading(false);
     }
   };
 
-  const downloadCertificate = async () => {
-    const uri = `${apiUrl}/certificate`;
-    const fileUri = `${FileSystem.documentDirectory}clearance.pdf`;
+  const handleFetchError = (err) => {
+    let message = 'Failed to load clearance status';
+    if (err.response) {
+      const { status: httpStatus, data } = err.response;
+      if (httpStatus === 401) {
+        message = 'Session expired. Please log in again.';
+        Alert.alert('Error', message, [
+          {
+            text: 'OK',
+            onPress: () => {
+              signOut();
+              router.replace('/login');
+            },
+          },
+        ]);
+        return;
+      } else if (data.message) {
+        message = data.message;
+      }
+    } else if (err.request) {
+      message = 'Network error. Please check your connection.';
+    }
+    setError(message);
+  };
 
+  const downloadCertificate = async () => {
     try {
-      const { uri: downloadedUri } = await FileSystem.downloadAsync(uri, fileUri, {
+      // 1. Get the PDF as blob
+      const response = await axios.get(`${apiUrl}/certificate`, {
         headers: { Authorization: `Bearer ${session}` },
+        responseType: 'blob'
       });
-      await Sharing.shareAsync(downloadedUri);
-      Alert.alert('Success', 'Certificate downloaded and shared');
+  
+      // 2. Create object URL
+      const blob = new Blob([response.data], { type: 'application/pdf' });
+      const url = URL.createObjectURL(blob);
+      
+      // 3. Open in browser
+      await Linking.openURL(url);
+      
     } catch (error) {
-      Alert.alert('Error', 'Failed to download certificate');
-      console.error('Download error:', error);
+      Alert.alert('Error', 'Download failed');
     }
   };
 
@@ -105,12 +106,13 @@ export default function CertificateScreen() {
   const isCleared = status?.clearanceStatus?.every((cs) => cs.status === 'cleared');
   const pendingDepartments = status?.clearanceStatus
     ?.filter((cs) => cs.status !== 'cleared')
-    .map((cs) => cs.department)
-    .join(', ');
+    ?.map((cs) => cs.department)
+    ?.join(', ');
 
   return (
     <View style={styles.container}>
       <Text style={styles.title}>Clearance Certificate</Text>
+      
       {loading ? (
         <View style={styles.loadingContainer}>
           <ActivityIndicator size="large" color={primaryColor} />
@@ -137,14 +139,23 @@ export default function CertificateScreen() {
           <Text style={styles.message}>
             You are not yet cleared to download your certificate.
           </Text>
-          <Text style={styles.details}>
-            Pending departments: {pendingDepartments || 'None'}
-          </Text>
+          {pendingDepartments && (
+            <Text style={styles.details}>
+              Pending departments: {pendingDepartments}
+            </Text>
+          )}
+          <TouchableOpacity 
+            style={[styles.downloadButton, { backgroundColor: '#ccc' }]} 
+            onPress={fetchStatus}
+          >
+            <Text style={styles.downloadButtonText}>Refresh Status</Text>
+          </TouchableOpacity>
         </View>
       )}
     </View>
   );
 }
+
 
 const styles = StyleSheet.create({
   container: {

@@ -9,6 +9,7 @@ dotenv.config();
 const students = [
   {
     studentId: 'CT201/111801/22',
+    name: 'Saddam Saku',
     email: 'saddam@students.must.ac.ke',
     yearOfStudy: 4,
     obligations: [
@@ -54,6 +55,7 @@ const students = [
   },
   {
     studentId: 'CT201/111802/22',
+    name: 'Obadiah Muturi',
     email: 'obadiah@students.must.ac.ke',
     yearOfStudy: 4,
     obligations: [
@@ -88,6 +90,7 @@ const students = [
   },
   {
     studentId: 'CT201/109301/22',
+    name: 'Sang Karanja',
     email: 'sang@students.must.ac.ke',
     yearOfStudy: 2,
     obligations: [],

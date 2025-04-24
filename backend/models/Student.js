@@ -20,6 +20,7 @@ const clearanceStatusSchema = new mongoose.Schema({
 
 const studentSchema = new mongoose.Schema({
   studentId: { type: String, required: true, unique: true },
+  name: { type: String, required: true },
   email: { type: String, required: true, unique: true },
   password: { type: String, required: true },
   yearOfStudy: { type: Number, required: true },

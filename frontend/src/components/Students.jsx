@@ -186,7 +186,7 @@ function Students() {
                               : 'text-red-600'
                           }`}
                         >
-                          {student.overallStatus}
+                          {student.yearOfStudy === 4 ? student.overallStatus:'N/A'}
                         </td>
                       </tr>
                     ))

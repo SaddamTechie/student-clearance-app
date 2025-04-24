@@ -12,6 +12,8 @@ import axios from 'axios';
 import { apiUrl } from '../../config';
 import { useSession } from '@/ctx';
 import { useRouter } from 'expo-router';
+import * as FileSystem from 'expo-file-system';
+import * as Sharing from 'expo-sharing';
 
 const primaryColor = '#7ABB3B';
 const textColor = '#333';
@@ -81,21 +83,37 @@ export default function CertificateScreen() {
 
   const downloadCertificate = async () => {
     try {
-      // 1. Get the PDF as blob
-      const response = await axios.get(`${apiUrl}/certificate`, {
-        headers: { Authorization: `Bearer ${session}` },
-        responseType: 'blob'
-      });
-  
-      // 2. Create object URL
-      const blob = new Blob([response.data], { type: 'application/pdf' });
-      const url = URL.createObjectURL(blob);
+      setLoading(true);
       
-      // 3. Open in browser
-      await Linking.openURL(url);
+      // 1. Download the file to a temporary location
+      const downloadResumable = FileSystem.createDownloadResumable(
+        `${apiUrl}/certificate`,
+        FileSystem.documentDirectory + 'certificate.pdf',
+        {
+          headers: { Authorization: `Bearer ${session}` }
+        }
+      );
       
+      const { uri } = await downloadResumable.downloadAsync();
+      
+      // 2. Check if sharing is available
+      const isSharingAvailable = await Sharing.isAvailableAsync();
+      
+      if (isSharingAvailable) {
+        // 3. Open the PDF with the system viewer
+        await Sharing.shareAsync(uri, {
+          mimeType: 'application/pdf',
+          dialogTitle: 'View Your Certificate',
+          UTI: 'com.adobe.pdf'
+        });
+      } else {
+        Alert.alert('Error', 'Sharing is not available on this device');
+      }
     } catch (error) {
-      Alert.alert('Error', 'Download failed');
+      console.error('Download error:', error);
+      Alert.alert('Error', 'Download failed: ' + (error.message || 'Unknown error'));
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -130,8 +148,16 @@ export default function CertificateScreen() {
           <Text style={styles.message}>
             Congratulations! You are fully cleared to download your certificate.
           </Text>
-          <TouchableOpacity style={styles.downloadButton} onPress={downloadCertificate}>
-            <Text style={styles.downloadButtonText}>Download Certificate</Text>
+          <TouchableOpacity 
+            style={styles.downloadButton} 
+            onPress={downloadCertificate}
+            disabled={loading}
+          >
+            {loading ? (
+              <ActivityIndicator color="#fff" size="small" />
+            ) : (
+              <Text style={styles.downloadButtonText}>Download Certificate</Text>
+            )}
           </TouchableOpacity>
         </View>
       ) : (
@@ -147,15 +173,19 @@ export default function CertificateScreen() {
           <TouchableOpacity 
             style={[styles.downloadButton, { backgroundColor: '#ccc' }]} 
             onPress={fetchStatus}
+            disabled={loading}
           >
-            <Text style={styles.downloadButtonText}>Refresh Status</Text>
+            {loading ? (
+              <ActivityIndicator color="#fff" size="small" />
+            ) : (
+              <Text style={styles.downloadButtonText}>Refresh Status</Text>
+            )}
           </TouchableOpacity>
         </View>
       )}
     </View>
   );
 }
-
 
 const styles = StyleSheet.create({
   container: {
@@ -231,6 +261,8 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     marginTop: 16,
     width: '80%',
+    minHeight: 56,
+    justifyContent: 'center',
   },
   downloadButtonText: {
     color: '#fff',

@@ -282,7 +282,7 @@ router.post('/staff/register', authMiddleware, roleMiddleware(['admin']), async 
     await staff.save();
 
     // Send email with default password (configure sendEmail later)
-    //sendEmail(email, 'Your Staff Account', `Your login credentials: Email: ${email}, Password: ${defaultPassword}`);
+    sendEmail(email, 'Your Staff Account', `Your login credentials: Email: ${email}, Password: ${defaultPassword}`);
     console.log(email, 'Your Staff Account', `Your login credentials: Email: ${email}, Password: ${defaultPassword}`)
     res.status(201).json({ message: 'Staff registered', staff });
   } catch (err) {
@@ -845,9 +845,10 @@ router.post('/staff/update-clearance', authMiddleware, async (req, res) => {
     } else if (status === 'cleared' && department === 'hostel') {
       student.clearanceRequestStatus = 'approved';
       student.clearanceRequestDepartment = null;
+      await sendEmail(student.email, 'Clearance Approved', `Your clearance request has been approved and is completed.`);
     }
     if (status === 'rejected') {
-      student.clearanceRequestStatus = 'rejected';
+      student.clearanceRequestStatus = null;
       student.clearanceRequestDepartment = null;
     }
     await student.save();

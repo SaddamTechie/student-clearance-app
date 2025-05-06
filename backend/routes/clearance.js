@@ -853,7 +853,7 @@ router.post('/staff/update-clearance', authMiddleware, async (req, res) => {
     }
     await student.save();
     // Notify student
-    await sendNotification(io, studentId, `Your ${department} clearance is ${status}. ${comment || ''}`);
+    await sendNotification(io, studentId, `Your ${department} request is ${status}. ${comment || ''}`);
     
     if (student.pushToken) {
       await sendPushNotification(
